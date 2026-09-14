@@ -165,7 +165,7 @@ export function WeddingInvitation() {
                 <p className={`mt-5 text-xs font-medium uppercase ${event.text}`}>{event.time}</p>
                 <div className={`mt-7 flex items-center gap-3 ${index % 2 ? "" : "md:justify-end"}`}><span className="text-[9px] uppercase text-muted-foreground">Dress palette</span>{event.dress.map((color) => <span key={color} className={`h-5 w-5 rounded-full border border-background shadow-sm ${color}`} />)}</div>
                 <div className={`mt-8 border-t border-border pt-6 ${index % 2 ? "" : "md:ml-auto"}`}>
-                  <p className="font-display text-xl">{{"{{VENUE_NAME}}"}}</p><p className="mt-1 text-xs text-muted-foreground">{{"{{VENUE_ADDRESS}}"}}</p>
+                  <p className="font-display text-xl">{"{{VENUE_NAME}}"}</p><p className="mt-1 text-xs text-muted-foreground">{"{{VENUE_ADDRESS}}"}</p>
                   <Button asChild variant="outline" size="sm" className="mt-4 border-gold/50 bg-transparent"><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("{{VENUE_NAME}} {{VENUE_ADDRESS}}")}`} target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button>
                 </div>
               </div>
