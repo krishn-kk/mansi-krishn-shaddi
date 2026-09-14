@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 const ceremonies = [
-  { day: "Day 01", date: "22 Nov", name: "Haldi", time: "11:00 AM", tone: "haldi", line: "A morning washed in gold and blessings.", dress: ["bg-haldi", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 02", date: "23 Nov", name: "Matkor & Rasam", time: "Time to be shared", tone: "terracotta", line: "Earth, song, and traditions passed down with love.", dress: ["bg-terracotta", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 03", date: "24 Nov", name: "Barat & Shaadi", time: "8:00 AM", tone: "maroon", line: "A joyful procession, a sacred promise, one forever.", dress: ["bg-maroon", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 05", date: "26 Nov", name: "Reception", time: "Time to be shared", tone: "navy", line: "An evening of celebration beneath a thousand lights.", dress: ["bg-navy", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 01", date: "22 Nov", name: "Haldi", time: "11:00 AM", dot: "bg-haldi", border: "border-haldi", text: "text-haldi", line: "A morning washed in gold and blessings.", dress: ["bg-haldi", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 02", date: "23 Nov", name: "Matkor & Rasam", time: "Time to be shared", dot: "bg-terracotta", border: "border-terracotta", text: "text-terracotta", line: "Earth, song, and traditions passed down with love.", dress: ["bg-terracotta", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 03", date: "24 Nov", name: "Barat & Shaadi", time: "8:00 AM", dot: "bg-maroon", border: "border-maroon", text: "text-maroon", line: "A joyful procession, a sacred promise, one forever.", dress: ["bg-maroon", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 05", date: "26 Nov", name: "Reception", time: "Time to be shared", dot: "bg-navy", border: "border-navy", text: "text-navy", line: "An evening of celebration beneath a thousand lights.", dress: ["bg-navy", "bg-gold", "bg-ivory-deep"] },
 ] as const;
 
 const target = new Date("2026-11-22T11:00:00+05:30").getTime();
@@ -155,14 +155,14 @@ export function WeddingInvitation() {
           <div className="absolute left-[16px] top-0 w-[3px] bg-gold transition-[height] duration-300 md:left-[calc(50%-1px)]" style={{ height: `${progress}%` }} />
           <div className="space-y-16 md:space-y-24">
             {ceremonies.map((event, index) => <article key={event.name} className={`relative ml-12 grid gap-8 md:ml-0 md:grid-cols-2 md:gap-20 ${index % 2 ? "md:[&>div:first-child]:col-start-2" : ""}`}>
-              <span className={`absolute -left-[39px] top-4 z-10 h-3 w-3 rounded-full bg-${event.tone} ring-4 ring-background md:left-[calc(50%-6px)]`} />
+              <span className={`absolute -left-[39px] top-4 z-10 h-3 w-3 rounded-full ring-4 ring-background md:left-[calc(50%-6px)] ${event.dot}`} />
               <div className={`${index % 2 ? "md:col-start-2" : "md:text-right"}`}>
-                <div className={`mb-5 inline-flex items-center gap-3 border-l-2 border-${event.tone} pl-4 ${index % 2 ? "" : "md:border-l-0 md:border-r-2 md:pl-0 md:pr-4"}`}>
+                <div className={`mb-5 inline-flex items-center gap-3 border-l-2 pl-4 ${event.border} ${index % 2 ? "" : "md:border-l-0 md:border-r-2 md:pl-0 md:pr-4"}`}>
                   <span className="text-[10px] uppercase text-muted-foreground">{event.day}</span><span className="font-display text-2xl text-maroon">{event.date}</span>
                 </div>
                 <h3 className="font-display text-5xl leading-none text-foreground md:text-6xl">{event.name}</h3>
                 <p className="mt-5 font-display text-xl italic text-muted-foreground">“{event.line}”</p>
-                <p className={`mt-5 text-xs font-medium uppercase text-${event.tone}`}>{event.time}</p>
+                <p className={`mt-5 text-xs font-medium uppercase ${event.text}`}>{event.time}</p>
                 <div className={`mt-7 flex items-center gap-3 ${index % 2 ? "" : "md:justify-end"}`}><span className="text-[9px] uppercase text-muted-foreground">Dress palette</span>{event.dress.map((color) => <span key={color} className={`h-5 w-5 rounded-full border border-background shadow-sm ${color}`} />)}</div>
                 <div className={`mt-8 border-t border-border pt-6 ${index % 2 ? "" : "md:ml-auto"}`}>
                   <p className="font-display text-xl">{{"{{VENUE_NAME}}"}}</p><p className="mt-1 text-xs text-muted-foreground">{{"{{VENUE_ADDRESS}}"}}</p>
