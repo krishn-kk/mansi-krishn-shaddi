@@ -98,7 +98,24 @@ export function WeddingInvitation() {
     return () => window.removeEventListener("scroll", update);
   }, []);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setSubmitted(true); };
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setSubmitError(null);
+    const form = new FormData(event.currentTarget);
+    const { error } = await supabase.from("rsvps").insert({
+      name: String(form.get("name") ?? "").trim(),
+      guest_count: Number(form.get("guests") ?? 1),
+      ceremonies_attending: form.getAll("ceremonies").map(String),
+      message: String(form.get("message") ?? "").trim() || null,
+    });
+    setSubmitting(false);
+    if (error) { setSubmitError("Something went wrong while sending your RSVP. Please try again in a moment."); return; }
+    setSubmitted(true);
+  };
 
   return <main className="bg-background text-foreground">
     <MusicToggle />
