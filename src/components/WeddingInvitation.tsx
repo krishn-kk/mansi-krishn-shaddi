@@ -211,7 +211,8 @@ export function WeddingInvitation() {
         <label className="block text-xs uppercase">Number of guests<Input required name="guests" type="number" min="1" max="10" defaultValue="1" className="mt-2 h-12 border-x-0 border-t-0 rounded-none px-0" /></label>
         <fieldset><legend className="mb-4 text-xs uppercase">Celebrations you’ll attend</legend><div className="grid gap-4 sm:grid-cols-2">{ceremonies.map((event) => <label key={event.name} className="flex items-center gap-3 text-sm"><Checkbox name="ceremonies" value={event.name} />{event.name}</label>)}</div></fieldset>
         <label className="block text-xs uppercase">A note for us <span className="normal-case text-muted-foreground">(optional)</span><Textarea name="message" className="mt-2 min-h-28 border-x-0 border-t-0 rounded-none px-0" placeholder="Write a little something…" /></label>
-        <Button type="submit" variant="invitation" size="lg">Send my RSVP</Button>
+        {submitError && <p role="alert" className="border border-terracotta/50 bg-terracotta/10 px-4 py-3 text-sm text-terracotta">{submitError}</p>}
+        <Button type="submit" variant="invitation" size="lg" disabled={submitting}>{submitting ? "Sending…" : "Send my RSVP"}</Button>
       </form>}
     </div></section>
 
