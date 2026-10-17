@@ -69,7 +69,7 @@ function MusicToggle() {
 }
 
 function downloadCalendar() {
-  const entries = [
+  const entries: [string, string, string, string][] = [
     ["20261122T053000Z", "20261122T073000Z", "Haldi — Krishn & Mansi", "Home, Workshop colony"],
     ["20261123T033000Z", "20261123T053000Z", "Matkor & Rasam — Krishn & Mansi", "Home, Workshop colony"],
     ["20261124T023000Z", "20261124T073000Z", "Barat & Shaadi — Krishn & Mansi", "Celebration Point Community Hall, Patna, Bihar"],
