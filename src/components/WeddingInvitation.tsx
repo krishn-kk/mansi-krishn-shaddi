@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CalendarPlus, Check, MapPin, Music, VolumeX } from "lucide-react";
 import heroImage from "@/assets/wedding-hero.jpg";
+import galleryImage1 from "@/assets/wedding-gallery-01.jpeg.asset.json";
+import galleryImage2 from "@/assets/wedding-gallery-02.jpeg.asset.json";
+import galleryImage3 from "@/assets/wedding-gallery-03.jpeg.asset.json";
+import galleryImage4 from "@/assets/wedding-gallery-04.jpeg.asset.json";
+import galleryImage5 from "@/assets/wedding-gallery-05.jpeg.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,6 +18,14 @@ const ceremonies = [
   { day: "Day 03", date: "24 Nov", name: "Barat & Shaadi", time: "8:00 AM", venue: "Celebration Point Community Hall", address: "Patna, Bihar", directions: "https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6", dot: "bg-maroon", border: "border-maroon", text: "text-maroon", line: "A joyful procession, a sacred promise, one forever.", dress: ["bg-maroon", "bg-gold", "bg-ivory-deep"] },
   { day: "Day 05", date: "26 Nov", name: "Reception", time: "Time to be shared", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-navy", border: "border-navy", text: "text-navy", line: "An evening of celebration beneath a thousand lights.", dress: ["bg-navy", "bg-gold", "bg-ivory-deep"] },
 ] as const;
+
+const galleryImages = [
+  { src: galleryImage1.url, alt: "Krishn and Mansi together beneath a floral arch" },
+  { src: galleryImage2.url, alt: "Krishn and Mansi sharing a joyful moment at their celebration" },
+  { src: galleryImage3.url, alt: "Krishn and Mansi standing together at a celebration" },
+  { src: galleryImage4.url, alt: "Krishn and Mansi celebrating together beneath the lights" },
+  { src: galleryImage5.url, alt: "Krishn and Mansi sharing a dance" },
+];
 
 const target = new Date("2026-11-22T11:00:00+05:30").getTime();
 const pad = (value: number) => String(Math.max(0, value)).padStart(2, "0");
@@ -195,11 +208,10 @@ export function WeddingInvitation() {
     </section>
 
     <section className="bg-maroon px-5 py-24 text-primary-foreground md:py-32">
-      <div className="mx-auto max-w-6xl"><div className="mb-12 md:flex md:items-end md:justify-between"><div><p className="text-[10px] uppercase text-gold">Moments</p><h2 className="mt-3 font-display text-5xl md:text-7xl">A few pages before forever</h2></div><p className="mt-4 max-w-xs text-sm text-primary-foreground/65">Photographs to be added as our story unfolds.</p></div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-          {["{{GALLERY_IMAGE_1}}", "{{GALLERY_IMAGE_2}}", "{{GALLERY_IMAGE_3}}", "{{GALLERY_IMAGE_4}}"].map((token, index) => <figure key={token} className={`${index % 3 === 0 ? "row-span-2" : ""} group relative min-h-52 overflow-hidden md:min-h-72`}>
-            <img data-placeholder-token={token} src={heroImage} alt={`Gallery placeholder ${index + 1} for Krishn and Mansi`} width={1280} height={1600} loading="lazy" className={`h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 ${index === 1 ? "object-left" : index === 2 ? "object-right" : ""}`} />
-            <figcaption className="absolute inset-x-3 bottom-3 border border-primary-foreground/30 bg-maroon/65 px-3 py-2 text-center text-[9px] uppercase backdrop-blur-sm">{token}</figcaption>
+      <div className="mx-auto max-w-6xl"><div className="mb-12 md:flex md:items-end md:justify-between"><div><p className="text-[10px] uppercase text-gold">Moments</p><h2 className="mt-3 font-display text-5xl md:text-7xl">A few pages before forever</h2></div><p className="mt-4 max-w-xs text-sm text-primary-foreground/65">A handful of moments, held close.</p></div>
+        <div className="grid auto-rows-[12rem] grid-cols-2 gap-3 md:auto-rows-[14rem] md:grid-cols-4 md:gap-5">
+          {galleryImages.map((image, index) => <figure key={image.src} className={`group relative min-h-0 overflow-hidden ${index === 0 ? "row-span-2" : ""} ${index === 1 || index === 4 ? "md:col-span-2" : ""}`}>
+            <img src={image.src} alt={image.alt} width={1280} height={1600} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
           </figure>)}
         </div>
       </div>
