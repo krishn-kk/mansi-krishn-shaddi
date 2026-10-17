@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 const ceremonies = [
-  { day: "Day 01", date: "22 Nov", name: "Haldi", time: "11:00 AM", dot: "bg-haldi", border: "border-haldi", text: "text-haldi", line: "A morning washed in gold and blessings.", dress: ["bg-haldi", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 02", date: "23 Nov", name: "Matkor & Rasam", time: "Time to be shared", dot: "bg-terracotta", border: "border-terracotta", text: "text-terracotta", line: "Earth, song, and traditions passed down with love.", dress: ["bg-terracotta", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 03", date: "24 Nov", name: "Barat & Shaadi", time: "8:00 AM", dot: "bg-maroon", border: "border-maroon", text: "text-maroon", line: "A joyful procession, a sacred promise, one forever.", dress: ["bg-maroon", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 05", date: "26 Nov", name: "Reception", time: "Time to be shared", dot: "bg-navy", border: "border-navy", text: "text-navy", line: "An evening of celebration beneath a thousand lights.", dress: ["bg-navy", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 01", date: "22 Nov", name: "Haldi", time: "11:00 AM", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-haldi", border: "border-haldi", text: "text-haldi", line: "A morning washed in gold and blessings.", dress: ["bg-haldi", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 02", date: "23 Nov", name: "Matkor & Rasam", time: "Time to be shared", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-terracotta", border: "border-terracotta", text: "text-terracotta", line: "Earth, song, and traditions passed down with love.", dress: ["bg-terracotta", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 03", date: "24 Nov", name: "Barat & Shaadi", time: "8:00 AM", venue: "Celebration Point Community Hall", address: "Patna, Bihar", directions: "https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6", dot: "bg-maroon", border: "border-maroon", text: "text-maroon", line: "A joyful procession, a sacred promise, one forever.", dress: ["bg-maroon", "bg-gold", "bg-ivory-deep"] },
+  { day: "Day 05", date: "26 Nov", name: "Reception", time: "Time to be shared", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-navy", border: "border-navy", text: "text-navy", line: "An evening of celebration beneath a thousand lights.", dress: ["bg-navy", "bg-gold", "bg-ivory-deep"] },
 ] as const;
 
 const target = new Date("2026-11-22T11:00:00+05:30").getTime();
@@ -70,12 +70,13 @@ function MusicToggle() {
 
 function downloadCalendar() {
   const entries = [
-    ["20261122T053000Z", "20261122T073000Z", "Haldi — Krishn & Mansi"],
-    ["20261123T033000Z", "20261123T053000Z", "Matkor & Rasam — Krishn & Mansi"],
-    ["20261124T023000Z", "20261124T073000Z", "Barat & Shaadi — Krishn & Mansi"],
-    ["20261126T123000Z", "20261126T153000Z", "Reception — Krishn & Mansi"],
+    ["20261122T053000Z", "20261122T073000Z", "Haldi — Krishn & Mansi", "Home, Workshop colony"],
+    ["20261123T033000Z", "20261123T053000Z", "Matkor & Rasam — Krishn & Mansi", "Home, Workshop colony"],
+    ["20261124T023000Z", "20261124T073000Z", "Barat & Shaadi — Krishn & Mansi", "Celebration Point Community Hall, Patna, Bihar"],
+    ["20261126T123000Z", "20261126T153000Z", "Reception — Krishn & Mansi", "Home, Workshop colony"],
   ];
-  const events = entries.map(([start, end, summary]) => `BEGIN:VEVENT\nDTSTART:${start}\nDTEND:${end}\nSUMMARY:${summary}\nLOCATION:{{VENUE_NAME}}, {{VENUE_ADDRESS}}\nEND:VEVENT`).join("\n");
+  const escapeIcs = (value: string) => value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+  const events = entries.map(([start, end, summary, location]) => `BEGIN:VEVENT\nDTSTART:${start}\nDTEND:${end}\nSUMMARY:${escapeIcs(summary)}\nLOCATION:${escapeIcs(location)}\nEND:VEVENT`).join("\n");
   const file = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Krishn and Mansi//Wedding//EN\n${events}\nEND:VCALENDAR`;
   const url = URL.createObjectURL(new Blob([file], { type: "text/calendar" }));
   const link = document.createElement("a"); link.href = url; link.download = "krishn-mansi-wedding.ics"; link.click(); URL.revokeObjectURL(url);
@@ -183,8 +184,8 @@ export function WeddingInvitation() {
                 <p className={`mt-5 text-xs font-medium uppercase ${event.text}`}>{event.time}</p>
                 <div className={`mt-7 flex items-center gap-3 ${index % 2 ? "" : "md:justify-end"}`}><span className="text-[9px] uppercase text-muted-foreground">Dress palette</span>{event.dress.map((color) => <span key={color} className={`h-5 w-5 rounded-full border border-background shadow-sm ${color}`} />)}</div>
                 <div className={`mt-8 border-t border-border pt-6 ${index % 2 ? "" : "md:ml-auto"}`}>
-                  <p className="font-display text-xl">{"{{VENUE_NAME}}"}</p><p className="mt-1 text-xs text-muted-foreground">{"{{VENUE_ADDRESS}}"}</p>
-                  <Button asChild variant="outline" size="sm" className="mt-4 border-gold/50 bg-transparent"><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("{{VENUE_NAME}} {{VENUE_ADDRESS}}")}`} target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button>
+                  <p className="font-display text-xl">{event.venue}</p><p className="mt-1 text-xs text-muted-foreground">{event.address}</p>
+                  <Button asChild variant="outline" size="sm" className="mt-4 border-gold/50 bg-transparent"><a href={event.directions} target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button>
                 </div>
               </div>
             </article>)}
@@ -216,7 +217,7 @@ export function WeddingInvitation() {
       </form>}
     </div></section>
 
-    <section className="bg-ivory-deep/50 px-5 py-20"><div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2"><div><p className="text-[10px] uppercase text-gold">For your journey</p><h2 className="mt-4 font-display text-4xl text-maroon">Travel & stay</h2><p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">{"{{ACCOMMODATION_AND_TRAVEL_INFO}}"}</p></div><div className="border-l border-gold/40 pl-7"><MapPin className="text-gold" /><p className="mt-4 font-display text-2xl">{"{{VENUE_NAME}}"}</p><p className="mt-2 text-sm text-muted-foreground">{"{{VENUE_ADDRESS}}"}</p><Button asChild variant="outline" size="sm" className="mt-5 border-gold/50 bg-transparent"><a href="https://www.google.com/maps/search/?api=1&query=%7B%7BVENUE_NAME%7D%7D%20%7B%7BVENUE_ADDRESS%7D%7D" target="_blank" rel="noreferrer">Get directions</a></Button></div></div></section>
+    <section className="bg-ivory-deep/50 px-5 py-20"><div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2"><div><p className="text-[10px] uppercase text-gold">For your journey</p><h2 className="mt-4 font-display text-4xl text-maroon">Travel & stay</h2><p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">{"{{ACCOMMODATION_AND_TRAVEL_INFO}}"}</p></div><div className="border-l border-gold/40 pl-7"><MapPin className="text-gold" /><p className="mt-4 text-[10px] uppercase text-gold">Ceremony venues</p><div className="mt-4 space-y-6">{[{ name: "Home", address: "Workshop colony", href: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", events: "Haldi · Matkor & Rasam · Reception" }, { name: "Celebration Point Community Hall", address: "Patna, Bihar", href: "https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6", events: "Barat & Shaadi" }].map((venue) => <div key={venue.name}><p className="font-display text-2xl">{venue.name}</p><p className="mt-1 text-sm text-muted-foreground">{venue.address}</p><p className="mt-2 text-xs text-muted-foreground">{venue.events}</p><Button asChild variant="outline" size="sm" className="mt-3 border-gold/50 bg-transparent"><a href={venue.href} target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button></div>)}</div></div></div></section>
 
     <footer className="flex min-h-[70dvh] flex-col items-center justify-center bg-maroon px-6 py-24 text-center text-primary-foreground"><Monogram /><p className="mt-10 font-display text-4xl italic sm:text-5xl">With love, laughter,<br />and our whole hearts.</p><p className="mt-7 max-w-md text-sm leading-relaxed text-primary-foreground/65">We look forward to beginning forever in the company of those we love most.</p><p className="mt-12 text-xs uppercase text-gold">Krishn & Mansi · November 2026</p><div className="mt-16 h-px w-16 bg-gold/40" /><p className="mt-5 text-[9px] uppercase text-primary-foreground/45">Made with love</p></footer>
   </main>;
