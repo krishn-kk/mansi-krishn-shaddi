@@ -179,6 +179,12 @@ export function WeddingInvitation() {
 
   const [rsvpError, setRsvpError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (stage === "open") { document.body.style.overflow = ""; return; }
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [stage]);
+
   const openInvitation = () => {
     if (stage !== "closed") return;
     setStage("opening");
