@@ -186,6 +186,30 @@
 @utility digit-change { animation: digit-in .45s ease-out both; }
 @utility petal-fall { animation: petal-fall var(--petal-duration, 11s) linear infinite; }
 
+@keyframes seal-breathe {
+  0%, 100% { box-shadow: var(--shadow-seal), 0 0 0 0 color-mix(in oklab, var(--gold) 40%, transparent); }
+  50% { box-shadow: var(--shadow-seal), 0 0 36px 9px color-mix(in oklab, var(--gold) 38%, transparent); }
+}
+@utility seal-breathe { animation: seal-breathe 2.8s ease-in-out infinite; }
+
+@keyframes door-left-open { to { transform: translateX(-104%); } }
+@keyframes door-right-open { to { transform: translateX(104%); } }
+@utility door-left { animation: door-left-open 1.9s cubic-bezier(.72,0,.28,1) .25s both; }
+@utility door-right { animation: door-right-open 1.9s cubic-bezier(.72,0,.28,1) .25s both; }
+
+@keyframes golden-flare {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.3); }
+  55% { opacity: 1; }
+  100% { opacity: .95; transform: translate(-50%, -50%) scale(2.6); }
+}
+@utility golden-flare { animation: golden-flare 1.9s cubic-bezier(.4,0,.2,1) .25s both; }
+
+@keyframes cover-content-fade { to { opacity: 0; transform: scale(.985); } }
+@utility cover-content-fade { animation: cover-content-fade .55s ease-in .2s both; }
+
+@keyframes cover-out { to { opacity: 0; } }
+@utility cover-out { animation: cover-out .5s ease-in 1.6s both; }
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
