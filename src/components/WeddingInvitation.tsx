@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { CalendarPlus, Check, MapPin, Music, VolumeX } from "lucide-react";
+import { CalendarPlus, Check, MapPin, Music, Send, VolumeX } from "lucide-react";
 import heroImage from "@/assets/wedding-hero.jpg";
+import coverImage from "@/assets/wedding-cover.jpg";
 import galleryImage1 from "@/assets/wedding-gallery-01.jpeg.asset.json";
 import galleryImage2 from "@/assets/wedding-gallery-02.jpeg.asset.json";
 import galleryImage3 from "@/assets/wedding-gallery-03.jpeg.asset.json";
@@ -26,6 +27,9 @@ const galleryImages = [
   { src: galleryImage4.url, alt: "Krishn and Mansi celebrating together beneath the lights" },
   { src: galleryImage5.url, alt: "Krishn and Mansi sharing a dance" },
 ];
+
+const WHATSAPP_NUMBER = "919583191615";
+const MUSIC_VIDEO_ID = "_BduB3uQciw";
 
 const target = new Date("2026-11-22T11:00:00+05:30").getTime();
 const pad = (value: number) => String(Math.max(0, value)).padStart(2, "0");
@@ -54,31 +58,92 @@ function Countdown() {
   </div>;
 }
 
+type YTPlayer = {
+  playVideo: () => void;
+  pauseVideo: () => void;
+  mute: () => void;
+  unMute: () => void;
+  setVolume: (volume: number) => void;
+  destroy: () => void;
+};
+
+let youTubeApiPromise: Promise<any> | null = null;
+function loadYouTubeApi() {
+  if (youTubeApiPromise) return youTubeApiPromise;
+  youTubeApiPromise = new Promise((resolve) => {
+    const existing = (window as any).YT;
+    if (existing?.Player) { resolve(existing); return; }
+    const previous = (window as any).onYouTubeIframeAPIReady;
+    (window as any).onYouTubeIframeAPIReady = () => { previous?.(); resolve((window as any).YT); };
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    document.head.appendChild(script);
+  });
+  return youTubeApiPromise;
+}
+
 function MusicToggle() {
   const [playing, setPlaying] = useState(false);
-  const contextRef = useRef<AudioContext | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
-  const toggle = () => {
-    if (!contextRef.current) {
-      const AudioCtx = window.AudioContext ?? window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const context = new AudioCtx();
-      const gain = context.createGain();
-      gain.gain.value = 0.025;
-      gain.connect(context.destination);
-      [196, 246.94, 293.66].forEach((frequency, index) => {
-        const oscillator = context.createOscillator();
-        oscillator.type = "sine"; oscillator.frequency.value = frequency;
-        const voice = context.createGain(); voice.gain.value = 0.34 / (index + 1);
-        oscillator.connect(voice).connect(gain); oscillator.start();
+  const hostRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const audioRef = useRef<{ context: AudioContext; gain: GainNode } | null>(null);
+
+  const startFallbackAudio = () => {
+    const AudioCtx = window.AudioContext ?? window.webkitAudioContext;
+    if (!AudioCtx) return null;
+    const context = new AudioCtx();
+    const gain = context.createGain();
+    gain.gain.value = 0.025;
+    gain.connect(context.destination);
+    [196, 246.94, 293.66].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      oscillator.type = "sine"; oscillator.frequency.value = frequency;
+      const voice = context.createGain(); voice.gain.value = 0.34 / (index + 1);
+      oscillator.connect(voice).connect(gain); oscillator.start();
+    });
+    return { context, gain };
+  };
+
+  const start = () => {
+    if (playerRef.current || audioRef.current) return;
+    void loadYouTubeApi().then((YT) => {
+      if (playerRef.current || audioRef.current) return;
+      if (!YT?.Player || !hostRef.current) { audioRef.current = startFallbackAudio(); setPlaying(true); return; }
+      playerRef.current = new YT.Player(hostRef.current, {
+        videoId: MUSIC_VIDEO_ID,
+        playerVars: { autoplay: 1, controls: 0, disablekb: 1, loop: 1, playlist: MUSIC_VIDEO_ID, playsinline: 1, iv_load_policy: 3, modestbranding: 1 },
+        events: {
+          onReady: (event: { target: YTPlayer }) => {
+            event.target.unMute();
+            event.target.setVolume(45);
+            event.target.playVideo();
+            setPlaying(true);
+          },
+          onError: () => { audioRef.current = startFallbackAudio(); setPlaying(true); },
+        },
       });
-      contextRef.current = context; gainRef.current = gain;
-    }
+    });
+  };
+
+  const toggle = () => {
+    if (!playerRef.current && !audioRef.current) { start(); return; }
     const next = !playing;
-    if (gainRef.current) gainRef.current.gain.setTargetAtTime(next ? 0.025 : 0, contextRef.current?.currentTime ?? 0, 0.2);
+    if (playerRef.current) {
+      if (next) { playerRef.current.unMute(); playerRef.current.playVideo(); }
+      else playerRef.current.mute();
+    } else if (audioRef.current) {
+      audioRef.current.gain.gain.setTargetAtTime(next ? 0.025 : 0, audioRef.current.context.currentTime, 0.2);
+    }
     setPlaying(next);
   };
-  return <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label={playing ? "Mute ambient music" : "Play ambient music"} title={playing ? "Mute music" : "Play music"} className="fixed right-4 top-4 z-50 rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{playing ? <Music /> : <VolumeX />}</Button>;
+
+  useEffect(() => () => { try { playerRef.current?.destroy(); } catch { /* player already gone */ } void audioRef.current?.context.close(); }, []);
+
+  return <>
+    <div ref={hostRef} aria-hidden="true" className="pointer-events-none fixed bottom-0 left-0 h-px w-px overflow-hidden opacity-0" />
+    <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label={playing ? "Mute the music" : "Play the music"} title={playing ? "Mute music" : "Play music"} className="fixed right-4 top-4 z-50 rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{playing ? <Music /> : <VolumeX />}</Button>
+  </>;
 }
 
 function downloadCalendar() {
@@ -96,7 +161,7 @@ function downloadCalendar() {
 }
 
 export function WeddingInvitation() {
-  const [opened, setOpened] = useState(false);
+  const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
   const [submitted, setSubmitted] = useState(false);
   const storyRef = useRef<HTMLElement>(null);
   const [progress, setProgress] = useState(0);
@@ -112,37 +177,72 @@ export function WeddingInvitation() {
     return () => window.removeEventListener("scroll", update);
   }, []);
 
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (stage === "open") { document.body.style.overflow = ""; return; }
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [stage]);
+
+  const openInvitation = () => {
+    if (stage !== "closed") return;
+    setStage("opening");
+    window.setTimeout(() => setStage("open"), 2150);
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitting(true);
-    setSubmitError(null);
     const form = new FormData(event.currentTarget);
-    const { error } = await supabase.from("rsvps").insert({
-      name: String(form.get("name") ?? "").trim(),
-      guest_count: Number(form.get("guests") ?? 1),
-      ceremonies_attending: form.getAll("ceremonies").map(String),
-      message: String(form.get("message") ?? "").trim() || null,
-    });
-    setSubmitting(false);
-    if (error) { setSubmitError("Something went wrong while sending your RSVP. Please try again in a moment."); return; }
+    const name = String(form.get("name") ?? "").trim();
+    const guests = String(form.get("guests") ?? "1").trim();
+    const selected = form.getAll("ceremonies").map(String);
+    const note = String(form.get("message") ?? "").trim();
+    if (!name || !guests) { setRsvpError("Please share your name and number of guests."); return; }
+    if (selected.length === 0) { setRsvpError("Please choose at least one celebration you’ll attend."); return; }
+    setRsvpError(null);
+
+    void supabase.from("rsvps").insert({ name, guest_count: Number(guests), ceremonies_attending: selected, message: note || null });
+
+    const lines = [
+      "Hello Krishn & Mansi ❤️",
+      "",
+      "Thank you for inviting us to celebrate your special days.",
+      "",
+      `Name: ${name}`,
+      `Number of Guests: ${guests}`,
+      "",
+      "We'll be joining you for:",
+      ...selected.map((celebration) => `• ${celebration}`),
+      ...(note ? ["", "A note for you:", note] : []),
+      "",
+      "Looking forward to celebrating with you both! ✨",
+    ];
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener,noreferrer");
     setSubmitted(true);
   };
 
   return <main className="bg-background text-foreground">
     <MusicToggle />
-    {!opened && <section className="fixed inset-0 z-40 grid min-h-dvh place-items-center overflow-hidden bg-maroon px-6 text-center text-primary-foreground">
-      <img src={heroImage} alt="Ivory silk, jasmine, and rose petals" width={1280} height={1600} className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-luminosity" />
-      <div className="relative flex flex-col items-center invitation-enter">
-        <p className="mb-7 text-[10px] uppercase">A wedding invitation</p>
-        <h1 className="font-display text-5xl sm:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
-        <div className="my-8 h-px w-20 bg-gold/60" />
-        <Button variant="seal" onClick={() => setOpened(true)} aria-label="Open Krishn and Mansi's wedding invitation">
-          <span className="flex flex-col items-center font-display text-xl"><span>K & M</span><span className="mt-1 font-sans text-[8px] uppercase">Tap to open</span></span>
-        </Button>
-        <p className="mt-8 font-display text-xl italic text-primary-foreground/75">Begin our story</p>
+    {stage !== "open" && <section aria-label="Closed wedding invitation" className={`fixed inset-0 z-40 overflow-hidden bg-maroon text-primary-foreground ${stage === "opening" ? "cover-out" : ""}`}>
+      <div className="absolute inset-0 grid grid-cols-2">
+        <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-left" : ""}`}>
+          <img src={coverImage} alt="" width={1024} height={1536} className="absolute left-0 top-0 h-full w-[200%] max-w-none object-cover" />
+        </div>
+        <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-right" : ""}`}>
+          <img src={coverImage} alt="" width={1024} height={1536} className="absolute right-0 top-0 h-full w-[200%] max-w-none object-cover" />
+        </div>
+      </div>
+      <div aria-hidden="true" className={`pointer-events-none absolute left-1/2 top-1/2 z-10 h-[70vmax] w-[70vmax] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0 ${stage === "opening" ? "golden-flare" : ""}`} style={{ background: "radial-gradient(closest-side, color-mix(in oklab, var(--haldi) 65%, white), var(--gold) 42%, transparent 72%)" }} />
+      <div className={`absolute inset-0 flex flex-col items-center justify-center px-6 text-center ${stage === "opening" ? "cover-content-fade" : "invitation-enter"}`}>
+        <p className="text-[10px] uppercase tracking-[.35em] text-primary-foreground/80">A wedding invitation</p>
+        <h1 className="mt-6 font-display text-5xl leading-tight sm:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
+        <div className="mt-9">
+          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={stage === "opening" ? "" : "seal-breathe"}>
+            <span className="flex flex-col items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span><span className="mt-1 font-sans text-[8px] uppercase not-italic tracking-[.25em]">Enter our celebration</span></span>
+          </Button>
+        </div>
+        <p className="mt-9 font-display text-xl italic text-primary-foreground/75">Begin our forever</p>
       </div>
     </section>}
 
@@ -219,17 +319,27 @@ export function WeddingInvitation() {
 
     <section className="px-5 py-24 md:py-36"><div className="mx-auto grid max-w-5xl gap-16 md:grid-cols-[.8fr_1.2fr] md:gap-24">
       <div><p className="text-[10px] uppercase text-gold">Kindly respond</p><h2 className="mt-4 font-display text-5xl text-maroon md:text-6xl">Will you join us?</h2><p className="mt-5 text-sm leading-relaxed text-muted-foreground">Your blessings are the greatest gift. Please let us know which moments we’ll share together.</p></div>
-      {submitted ? <div className="invitation-enter flex min-h-96 flex-col items-center justify-center border-y border-gold/40 text-center"><span className="grid h-14 w-14 place-items-center rounded-full bg-maroon text-primary-foreground"><Check /></span><h3 className="mt-6 font-display text-4xl text-maroon">With all our hearts, thank you.</h3><p className="mt-3 text-sm text-muted-foreground">We can’t wait to celebrate with you.</p></div> : <form onSubmit={submit} className="space-y-7">
+      {submitted ? <div className="invitation-enter flex min-h-96 flex-col items-center justify-center border-y border-gold/40 text-center"><span className="grid h-14 w-14 place-items-center rounded-full bg-maroon text-primary-foreground"><Check /></span><h3 className="mt-6 font-display text-4xl text-maroon">Your RSVP is ready on WhatsApp.</h3><p className="mt-3 text-sm text-muted-foreground">Just press send in the chat that opened — we can’t wait to celebrate with you.</p></div> : <form onSubmit={submit} className="space-y-7" noValidate>
         <label className="block text-xs uppercase">Your name<Input required name="name" className="mt-2 h-12 border-x-0 border-t-0 rounded-none px-0" placeholder="Full name" /></label>
         <label className="block text-xs uppercase">Number of guests<Input required name="guests" type="number" min="1" max="10" defaultValue="1" className="mt-2 h-12 border-x-0 border-t-0 rounded-none px-0" /></label>
         <fieldset><legend className="mb-4 text-xs uppercase">Celebrations you’ll attend</legend><div className="grid gap-4 sm:grid-cols-2">{ceremonies.map((event) => <label key={event.name} className="flex items-center gap-3 text-sm"><Checkbox name="ceremonies" value={event.name} />{event.name}</label>)}</div></fieldset>
         <label className="block text-xs uppercase">A note for us <span className="normal-case text-muted-foreground">(optional)</span><Textarea name="message" className="mt-2 min-h-28 border-x-0 border-t-0 rounded-none px-0" placeholder="Write a little something…" /></label>
-        {submitError && <p role="alert" className="border border-terracotta/50 bg-terracotta/10 px-4 py-3 text-sm text-terracotta">{submitError}</p>}
-        <Button type="submit" variant="invitation" size="lg" disabled={submitting}>{submitting ? "Sending…" : "Send my RSVP"}</Button>
+        {rsvpError && <p role="alert" className="border border-terracotta/50 bg-terracotta/10 px-4 py-3 text-sm text-terracotta">{rsvpError}</p>}
+        <Button type="submit" variant="invitation" size="lg" className="px-8"><Send /> Send RSVP on WhatsApp</Button>
       </form>}
     </div></section>
 
-    <section className="bg-ivory-deep/50 px-5 py-20"><div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-2"><div><p className="text-[10px] uppercase text-gold">For your journey</p><h2 className="mt-4 font-display text-4xl text-maroon">Travel & stay</h2><p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">{"{{ACCOMMODATION_AND_TRAVEL_INFO}}"}</p></div><div className="border-l border-gold/40 pl-7"><MapPin className="text-gold" /><p className="mt-4 text-[10px] uppercase text-gold">Ceremony venues</p><div className="mt-4 space-y-6">{[{ name: "Home", address: "Workshop colony", href: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", events: "Haldi · Matkor & Rasam · Reception" }, { name: "Celebration Point Community Hall", address: "Patna, Bihar", href: "https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6", events: "Barat & Shaadi" }].map((venue) => <div key={venue.name}><p className="font-display text-2xl">{venue.name}</p><p className="mt-1 text-sm text-muted-foreground">{venue.address}</p><p className="mt-2 text-xs text-muted-foreground">{venue.events}</p><Button asChild variant="outline" size="sm" className="mt-3 border-gold/50 bg-transparent"><a href={venue.href} target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button></div>)}</div></div></div></section>
+    <section className="bg-ivory-deep/50 px-5 py-24 md:py-32"><div className="mx-auto max-w-2xl text-center">
+      <p className="text-[10px] uppercase text-gold">For your journey</p>
+      <h2 className="mt-4 font-display text-4xl text-maroon md:text-5xl">Travel & stay</h2>
+      <div className="mt-10 border border-gold/35 bg-card/80 px-7 py-12 shadow-[var(--shadow-gold)]">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-gold/50 text-gold"><MapPin /></span>
+        <p className="mx-auto mt-7 max-w-sm text-sm leading-relaxed text-muted-foreground">Travel and stay arrangements are provided for <span className="font-medium text-maroon">Baraat guests only</span>. We look forward to welcoming you warmly.</p>
+        <p className="mt-9 font-display text-3xl text-maroon">Celebration Point, Patna</p>
+        <p className="mt-2 text-xs uppercase tracking-[.2em] text-muted-foreground">Time · 7:00 PM</p>
+        <Button asChild variant="outline" size="sm" className="mt-7 border-gold/50 bg-transparent"><a href="https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6" target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button>
+      </div>
+    </div></section>
 
     <footer className="flex min-h-[70dvh] flex-col items-center justify-center bg-maroon px-6 py-24 text-center text-primary-foreground"><Monogram /><p className="mt-10 font-display text-4xl italic sm:text-5xl">With love, laughter,<br />and our whole hearts.</p><p className="mt-7 max-w-md text-sm leading-relaxed text-primary-foreground/65">We look forward to beginning forever in the company of those we love most.</p><p className="mt-12 text-xs uppercase text-gold">Krishn & Mansi · November 2026</p><div className="mt-16 h-px w-16 bg-gold/40" /><p className="mt-5 text-[9px] uppercase text-primary-foreground/45">Made with love</p></footer>
   </main>;
