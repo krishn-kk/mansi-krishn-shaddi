@@ -235,6 +235,7 @@ export function WeddingInvitation() {
           <img src={coverImage} alt="" width={1024} height={1536} className="absolute right-0 top-0 h-full w-[200%] max-w-none object-cover" />
         </div>
       </div>
+      <div aria-hidden="true" className={`pointer-events-none absolute inset-0 opacity-0 ${stage === "opening" ? "golden-backdrop" : ""}`} style={{ background: "radial-gradient(ellipse 60% 70% at 50% 52%, color-mix(in oklab, var(--haldi) 60%, white), var(--gold) 45%, color-mix(in oklab, var(--gold) 55%, var(--maroon)) 75%, transparent)" }} />
       <div aria-hidden="true" className={`pointer-events-none absolute left-1/2 top-1/2 z-10 h-[70vmax] w-[70vmax] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0 ${stage === "opening" ? "golden-flare" : ""}`} style={{ background: "radial-gradient(closest-side, color-mix(in oklab, var(--haldi) 65%, white), var(--gold) 42%, transparent 72%)" }} />
       <div className={`absolute inset-0 flex flex-col items-center justify-center px-6 text-center ${stage === "opening" ? "cover-content-fade" : "invitation-enter"}`}>
         <p className="text-[10px] uppercase tracking-[.35em] text-primary-foreground/80">A wedding invitation</p>
