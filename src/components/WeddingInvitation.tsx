@@ -180,10 +180,11 @@ export function WeddingInvitation() {
   const [rsvpError, setRsvpError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (stage === "open") { document.documentElement.style.overflow = ""; document.body.style.overflow = ""; return; }
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => { document.documentElement.style.overflow = ""; document.body.style.overflow = ""; };
+    const lock = (el: HTMLElement) => { el.style.overflowY = "clip"; el.style.overflowX = "clip"; };
+    const unlock = (el: HTMLElement) => { el.style.overflowY = ""; el.style.overflowX = ""; };
+    if (stage === "open") { unlock(document.documentElement); unlock(document.body); return; }
+    lock(document.documentElement); lock(document.body);
+    return () => { unlock(document.documentElement); unlock(document.body); };
   }, [stage]);
 
   const openInvitation = () => {
