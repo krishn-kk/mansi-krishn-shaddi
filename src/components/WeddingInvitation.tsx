@@ -218,7 +218,7 @@ export function WeddingInvitation() {
       "",
       "Looking forward to celebrating with you both! ✨",
     ];
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener,noreferrer");
+    window.open(`https://api.whatsapp.com/send/?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener,noreferrer");
     setSubmitted(true);
   };
 
