@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { CalendarPlus, Check, MapPin, Music, Send, VolumeX } from "lucide-react";
+import { CalendarPlus, Check, MapPin, Music, VolumeX } from "lucide-react";
 import heroImage from "@/assets/wedding-hero.jpg";
 import coverImage from "@/assets/wedding-cover.jpg";
 import galleryImage1 from "@/assets/wedding-gallery-01.jpeg.asset.json";
@@ -46,6 +46,10 @@ function useCountdown() {
 
 function Monogram({ small = false }: { small?: boolean }) {
   return <div aria-label="Krishn and Mansi" className={`${small ? "h-12 w-12 text-lg" : "h-20 w-20 text-2xl"} grid place-items-center rounded-full border border-gold/70 font-display italic text-gold`}><span>K <span className="text-[.6em]">&</span> M</span></div>;
+}
+
+function WhatsAppIcon({ className = "" }: { className?: string }) {
+  return <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z" /></svg>;
 }
 
 function Countdown() {
@@ -220,7 +224,8 @@ export function WeddingInvitation() {
       "",
       "Looking forward to celebrating with you both! ✨",
     ];
-    window.open(`https://api.whatsapp.com/send/?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener,noreferrer");
+    const encodedMessage = encodeURIComponent(lines.join("\n"));
+    window.location.href = `https://api.whatsapp.com/send/?phone=${WHATSAPP_NUMBER}&text=${encodedMessage}&type=phone_number&app_absent=0`;
     setSubmitted(true);
   };
 
@@ -241,8 +246,11 @@ export function WeddingInvitation() {
         <p className="text-[10px] uppercase tracking-[.35em] text-primary-foreground/80">A wedding invitation</p>
         <h1 className="mt-6 font-display text-5xl leading-tight sm:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
         <div className="mt-9">
-          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={stage === "opening" ? "" : "seal-breathe"}>
-            <span className="flex flex-col items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span><span className="mt-1 font-sans text-[8px] uppercase not-italic tracking-[.25em]">Enter our celebration</span></span>
+          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-28 w-28 px-0 py-0 ${stage === "opening" ? "" : "seal-breathe"}`}>
+            <span className="relative block h-full w-full">
+              <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
+              <span className="absolute inset-x-0 bottom-0 translate-y-[5px] text-center font-sans text-[8px] uppercase not-italic tracking-[.25em]">Enter our celebration</span>
+            </span>
           </Button>
         </div>
         <p className="mt-9 font-display text-xl italic text-primary-foreground/75">Begin our forever</p>
@@ -328,7 +336,7 @@ export function WeddingInvitation() {
         <fieldset><legend className="mb-4 text-xs uppercase">Celebrations you’ll attend</legend><div className="grid gap-4 sm:grid-cols-2">{ceremonies.map((event) => <label key={event.name} className="flex items-center gap-3 text-sm"><Checkbox name="ceremonies" value={event.name} />{event.name}</label>)}</div></fieldset>
         <label className="block text-xs uppercase">A note for us <span className="normal-case text-muted-foreground">(optional)</span><Textarea name="message" className="mt-2 min-h-28 border-x-0 border-t-0 rounded-none px-0" placeholder="Write a little something…" /></label>
         {rsvpError && <p role="alert" className="border border-terracotta/50 bg-terracotta/10 px-4 py-3 text-sm text-terracotta">{rsvpError}</p>}
-        <Button type="submit" variant="invitation" size="lg" className="px-8"><Send /> Send RSVP on WhatsApp</Button>
+        <Button type="submit" variant="invitation" size="lg" className="border border-gold/60 px-8 shadow-[var(--shadow-gold)] transition-all duration-300 hover:shadow-[0_18px_45px_color-mix(in_oklab,var(--gold)_45%,transparent)] active:scale-[.97]"><WhatsAppIcon className="h-4 w-4" /> Send RSVP on WhatsApp</Button>
       </form>}
     </div></section>
 
