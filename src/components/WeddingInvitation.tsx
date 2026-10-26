@@ -246,7 +246,7 @@ export function WeddingInvitation() {
         <p className="text-[10px] uppercase tracking-[.35em] text-primary-foreground/80">A wedding invitation</p>
         <h1 className="mt-6 font-display text-5xl leading-tight sm:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
         <div className="mt-9">
-          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={stage === "opening" ? "" : "seal-breathe"}>
+          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-28 w-28 px-0 py-0 ${stage === "opening" ? "" : "seal-breathe"}`}>
             <span className="relative block h-full w-full">
               <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
               <span className="absolute inset-x-0 bottom-0 translate-y-[5px] text-center font-sans text-[8px] uppercase not-italic tracking-[.25em]">Enter our celebration</span>
