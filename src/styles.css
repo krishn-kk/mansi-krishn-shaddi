@@ -169,6 +169,10 @@
   button, a, input, textarea, select { letter-spacing: 0; }
 }
 
+#lovable-badge {
+  display: none !important;
+}
+
 .invitation-page {
   background-image:
     radial-gradient(circle at 12% 8%, color-mix(in oklab, var(--gold) 5%, transparent), transparent 24rem),
