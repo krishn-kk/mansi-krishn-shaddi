@@ -12,13 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-
-const ceremonies = [
-  { day: "Day 01", date: "22 Nov", name: "Haldi", time: "11:00 AM", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-haldi", border: "border-haldi", text: "text-haldi", line: "A morning washed in gold and blessings.", dress: ["bg-haldi", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 02", date: "23 Nov", name: "Matkor & Rasam", time: "Time to be shared", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-terracotta", border: "border-terracotta", text: "text-terracotta", line: "Earth, song, and traditions passed down with love.", dress: ["bg-terracotta", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 03", date: "24 Nov", name: "Barat & Shaadi", time: "8:00 AM", venue: "Celebration Point Community Hall", address: "Patna, Bihar", directions: "https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6", dot: "bg-maroon", border: "border-maroon", text: "text-maroon", line: "A joyful procession, a sacred promise, one forever.", dress: ["bg-maroon", "bg-gold", "bg-ivory-deep"] },
-  { day: "Day 05", date: "26 Nov", name: "Reception", time: "Time to be shared", venue: "Home", address: "Workshop colony", directions: "https://maps.app.goo.gl/X16diHdQzpcoAWAe9", dot: "bg-navy", border: "border-navy", text: "text-navy", line: "An evening of celebration beneath a thousand lights.", dress: ["bg-navy", "bg-gold", "bg-ivory-deep"] },
-] as const;
+import { CeremonyTimeline, ceremonies } from "@/components/CeremonyTimeline";
 
 const galleryImages = [
   { src: galleryImage1.url, alt: "Krishn and Mansi together beneath a floral arch" },
@@ -87,11 +81,27 @@ function loadYouTubeApi() {
   return youTubeApiPromise;
 }
 
-function MusicToggle() {
+type MusicController = {
+  playing: boolean;
+  blocked: boolean;
+  hostRef: React.RefObject<HTMLDivElement | null>;
+  start: () => void;
+  attempt: () => void;
+  toggle: () => void;
+};
+
+function useMusicController(): MusicController {
   const [playing, setPlaying] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const audioRef = useRef<{ context: AudioContext; gain: GainNode } | null>(null);
+  const playingRef = useRef(false);
+
+  const setPlayingState = (value: boolean) => {
+    playingRef.current = value;
+    setPlaying(value);
+  };
 
   const startFallbackAudio = () => {
     const AudioCtx = window.AudioContext ?? window.webkitAudioContext;
@@ -109,44 +119,86 @@ function MusicToggle() {
     return { context, gain };
   };
 
+  const startWithFallback = () => {
+    if (audioRef.current) { void audioRef.current.context.resume().catch(() => {}); return; }
+    const fallback = startFallbackAudio();
+    if (!fallback) { setBlocked(true); return; }
+    audioRef.current = fallback;
+    void fallback.context.resume()
+      .then(() => setPlayingState(true))
+      .catch(() => setBlocked(true));
+    window.setTimeout(() => {
+      if (audioRef.current && audioRef.current.context.state !== "running") setBlocked(true);
+    }, 1200);
+  };
+
   const start = () => {
-    if (playerRef.current || audioRef.current) return;
+    if (playerRef.current || audioRef.current) { if (audioRef.current) startWithFallback(); return; }
+    setBlocked(false);
     void loadYouTubeApi().then((YT) => {
-      if (playerRef.current || audioRef.current) return;
-      if (!YT?.Player || !hostRef.current) { audioRef.current = startFallbackAudio(); setPlaying(true); return; }
-      playerRef.current = new YT.Player(hostRef.current, {
-        videoId: MUSIC_VIDEO_ID,
-        playerVars: { autoplay: 1, controls: 0, disablekb: 1, loop: 1, playlist: MUSIC_VIDEO_ID, playsinline: 1, iv_load_policy: 3, modestbranding: 1 },
-        events: {
-          onReady: (event: { target: YTPlayer }) => {
-            event.target.unMute();
-            event.target.setVolume(45);
-            event.target.playVideo();
-            setPlaying(true);
+      if (playerRef.current || audioRef.current) { if (audioRef.current) startWithFallback(); return; }
+      if (!YT?.Player || !hostRef.current) { startWithFallback(); return; }
+      try {
+        playerRef.current = new YT.Player(hostRef.current, {
+          videoId: MUSIC_VIDEO_ID,
+          playerVars: { autoplay: 1, controls: 0, disablekb: 1, loop: 1, playlist: MUSIC_VIDEO_ID, playsinline: 1, iv_load_policy: 3, modestbranding: 1 },
+          events: {
+            onReady: (event: { target: YTPlayer }) => {
+              try {
+                event.target.unMute();
+                event.target.setVolume(45);
+                event.target.playVideo();
+              } catch { /* playback refused by the browser */ }
+              window.setTimeout(() => {
+                if (!playingRef.current && !audioRef.current) setBlocked(true);
+              }, 3000);
+            },
+            onStateChange: (event: { data: number; target: YTPlayer }) => {
+              if (event.data === 1) setPlayingState(true);
+            },
+            onError: () => { startWithFallback(); },
           },
-          onError: () => { audioRef.current = startFallbackAudio(); setPlaying(true); },
-        },
-      });
+        });
+      } catch { startWithFallback(); }
     });
+  };
+
+  const attempt = () => {
+    start();
+    window.setTimeout(() => { if (!playingRef.current) setBlocked(true); }, 4000);
   };
 
   const toggle = () => {
     if (!playerRef.current && !audioRef.current) { start(); return; }
-    const next = !playing;
+    const next = !playingRef.current;
+    setBlocked(false);
     if (playerRef.current) {
-      if (next) { playerRef.current.unMute(); playerRef.current.playVideo(); }
-      else playerRef.current.mute();
+      try {
+        if (next) { playerRef.current.unMute(); playerRef.current.playVideo(); }
+        else playerRef.current.pauseVideo();
+      } catch { /* player not ready yet */ }
     } else if (audioRef.current) {
-      audioRef.current.gain.gain.setTargetAtTime(next ? 0.025 : 0, audioRef.current.context.currentTime, 0.2);
+      if (next) void audioRef.current.context.resume().then(() => setPlayingState(true)).catch(() => setBlocked(true));
+      else void audioRef.current.context.suspend().then(() => setPlayingState(false));
     }
-    setPlaying(next);
+    setPlayingState(next);
   };
 
-  useEffect(() => () => { try { playerRef.current?.destroy(); } catch { /* player already gone */ } void audioRef.current?.context.close(); }, []);
+  useEffect(() => () => {
+    try { playerRef.current?.destroy(); } catch { /* player already gone */ }
+    void audioRef.current?.context.close();
+  }, []);
 
+  return { playing, blocked, hostRef, start, attempt, toggle };
+}
+
+function MusicToggle({ music }: { music: MusicController }) {
   return <>
-    <div ref={hostRef} aria-hidden="true" className="pointer-events-none fixed bottom-0 left-0 h-px w-px overflow-hidden opacity-0" />
-    <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label={playing ? "Mute the music" : "Play the music"} title={playing ? "Mute music" : "Play music"} className="fixed right-4 top-4 z-50 rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{playing ? <Music /> : <VolumeX />}</Button>
+    <div ref={music.hostRef} aria-hidden="true" className="pointer-events-none fixed bottom-0 left-0 h-px w-px overflow-hidden opacity-0" />
+    {music.blocked && !music.playing && (
+      <button type="button" onClick={music.toggle} className="fixed right-16 top-4 z-50 rounded-full border border-gold/50 bg-background/80 px-3 py-2 text-[9px] uppercase tracking-[.2em] text-maroon backdrop-blur-md transition-colors duration-300 hover:bg-background" aria-label="Play the music">Tap to play music ♪</button>
+    )}
+    <Button type="button" variant="outline" size="icon" onClick={music.toggle} aria-label={music.playing ? "Pause the music" : "Play the music"} title={music.playing ? "Pause music" : "Play music"} className="fixed right-4 top-4 z-50 rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{music.playing ? <Music /> : <VolumeX />}</Button>
   </>;
 }
 
@@ -166,20 +218,25 @@ function downloadCalendar() {
 
 export function WeddingInvitation() {
   const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
+  const music = useMusicController();
   const [submitted, setSubmitted] = useState(false);
-  const storyRef = useRef<HTMLElement>(null);
-  const [progress, setProgress] = useState(0);
   const petals = useMemo(() => Array.from({ length: 10 }, (_, index) => ({ left: `${7 + index * 9}%`, delay: `${(index * 1.7) % 8}s`, duration: `${9 + (index % 4) * 2}s` })), []);
 
+  const openInvitation = (auto = false) => {
+    if (stage !== "closed") return;
+    if (auto) music.attempt(); else music.start();
+    setStage("opening");
+    window.setTimeout(() => setStage("open"), 2150);
+  };
+
+  const openRef = useRef(openInvitation);
+  openRef.current = openInvitation;
+
   useEffect(() => {
-    const update = () => {
-      const section = storyRef.current; if (!section) return;
-      const rect = section.getBoundingClientRect();
-      setProgress(Math.min(100, Math.max(0, ((window.innerHeight * .55 - rect.top) / rect.height) * 100)));
-    };
-    window.addEventListener("scroll", update, { passive: true }); update();
-    return () => window.removeEventListener("scroll", update);
-  }, []);
+    if (stage !== "closed") return;
+    const id = window.setTimeout(() => openRef.current(true), 1500);
+    return () => window.clearTimeout(id);
+  }, [stage]);
 
   const [rsvpError, setRsvpError] = useState<string | null>(null);
 
@@ -190,12 +247,6 @@ export function WeddingInvitation() {
     lock(document.documentElement); lock(document.body);
     return () => { unlock(document.documentElement); unlock(document.body); };
   }, [stage]);
-
-  const openInvitation = () => {
-    if (stage !== "closed") return;
-    setStage("opening");
-    window.setTimeout(() => setStage("open"), 2150);
-  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -230,7 +281,7 @@ export function WeddingInvitation() {
   };
 
   return <main className="bg-background text-foreground">
-    <MusicToggle />
+    <MusicToggle music={music} />
     {stage !== "open" && <section aria-label="Closed wedding invitation" className={`fixed inset-0 z-40 overflow-hidden bg-maroon text-primary-foreground ${stage === "opening" ? "cover-out" : ""}`}>
       <div className="absolute inset-0 grid grid-cols-2">
         <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-left" : ""}`}>
@@ -246,7 +297,7 @@ export function WeddingInvitation() {
         <p className="text-[10px] uppercase tracking-[.35em] text-primary-foreground/80">A wedding invitation</p>
         <h1 className="mt-6 font-display text-5xl leading-tight sm:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
         <div className="mt-9">
-          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-28 w-28 px-0 py-0 ${stage === "opening" ? "" : "seal-breathe"}`}>
+          <Button type="button" variant="seal" onClick={() => openInvitation(false)} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-28 w-28 px-0 py-0 ${stage === "opening" ? "" : "seal-breathe"}`}>
             <span className="relative block h-full w-full">
               <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
               <span className="absolute inset-x-0 bottom-0 translate-y-[5px] text-center font-sans text-[8px] uppercase not-italic tracking-[.25em]">Enter our celebration</span>
@@ -290,33 +341,7 @@ export function WeddingInvitation() {
       <Button variant="invitation" size="lg" onClick={downloadCalendar} className="mt-10"><CalendarPlus /> Add all events to calendar</Button>
     </section>
 
-    <section ref={storyRef} className="relative px-5 py-24 md:py-36">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-20 text-center"><p className="text-[10px] uppercase text-gold">The celebration</p><h2 className="mt-4 font-display text-5xl text-maroon md:text-7xl">Four chapters of joy</h2></div>
-        <div className="relative">
-          <div className="absolute bottom-0 left-[17px] top-0 w-px bg-border md:left-1/2" />
-          <div className="absolute left-[16px] top-0 w-[3px] bg-gold transition-[height] duration-300 md:left-[calc(50%-1px)]" style={{ height: `${progress}%` }} />
-          <div className="space-y-16 md:space-y-24">
-            {ceremonies.map((event, index) => <article key={event.name} className={`relative ml-12 grid gap-8 md:ml-0 md:grid-cols-2 md:gap-20 ${index % 2 ? "md:[&>div:first-child]:col-start-2" : ""}`}>
-              <span className={`absolute -left-[39px] top-4 z-10 h-3 w-3 rounded-full ring-4 ring-background md:left-[calc(50%-6px)] ${event.dot}`} />
-              <div className={`${index % 2 ? "md:col-start-2" : "md:text-right"}`}>
-                <div className={`mb-5 inline-flex items-center gap-3 border-l-2 pl-4 ${event.border} ${index % 2 ? "" : "md:border-l-0 md:border-r-2 md:pl-0 md:pr-4"}`}>
-                  <span className="text-[10px] uppercase text-muted-foreground">{event.day}</span><span className="font-display text-2xl text-maroon">{event.date}</span>
-                </div>
-                <h3 className="font-display text-5xl leading-none text-foreground md:text-6xl">{event.name}</h3>
-                <p className="mt-5 font-display text-xl italic text-muted-foreground">“{event.line}”</p>
-                <p className={`mt-5 text-xs font-medium uppercase ${event.text}`}>{event.time}</p>
-                <div className={`mt-7 flex items-center gap-3 ${index % 2 ? "" : "md:justify-end"}`}><span className="text-[9px] uppercase text-muted-foreground">Dress palette</span>{event.dress.map((color) => <span key={color} className={`h-5 w-5 rounded-full border border-background shadow-sm ${color}`} />)}</div>
-                <div className={`mt-8 border-t border-border pt-6 ${index % 2 ? "" : "md:ml-auto"}`}>
-                  <p className="font-display text-xl">{event.venue}</p><p className="mt-1 text-xs text-muted-foreground">{event.address}</p>
-                  <Button asChild variant="outline" size="sm" className="mt-4 border-gold/50 bg-transparent"><a href={event.directions} target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button>
-                </div>
-              </div>
-            </article>)}
-          </div>
-        </div>
-      </div>
-    </section>
+    <CeremonyTimeline />
 
     <section className="bg-maroon px-5 py-24 text-primary-foreground md:py-32">
       <div className="mx-auto max-w-6xl"><div className="mb-12 md:flex md:items-end md:justify-between"><div><p className="text-[10px] uppercase text-gold">Moments</p><h2 className="mt-3 font-display text-5xl md:text-7xl">A few pages before forever</h2></div><p className="mt-4 max-w-xs text-sm text-primary-foreground/65">A handful of moments, held close.</p></div>
