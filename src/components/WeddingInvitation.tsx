@@ -164,7 +164,7 @@ export function WeddingInvitation() {
 
   useEffect(() => {
     if (!entranceReady || openingStartedRef.current) return;
-    autoOpenTimerRef.current = window.setTimeout(() => openInvitation("automatic"), 2000);
+    autoOpenTimerRef.current = window.setTimeout(() => openInvitation("automatic"), 3000);
     return () => {
       if (autoOpenTimerRef.current !== null) {
         window.clearTimeout(autoOpenTimerRef.current);
