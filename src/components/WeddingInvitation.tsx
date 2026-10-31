@@ -164,7 +164,7 @@ export function WeddingInvitation() {
 
   useEffect(() => {
     if (!entranceReady || openingStartedRef.current) return;
-    autoOpenTimerRef.current = window.setTimeout(() => openInvitation("automatic"), 1500);
+    autoOpenTimerRef.current = window.setTimeout(() => openInvitation("automatic"), 2000);
     return () => {
       if (autoOpenTimerRef.current !== null) {
         window.clearTimeout(autoOpenTimerRef.current);
@@ -227,7 +227,7 @@ export function WeddingInvitation() {
           <Button type="button" variant="seal" onClick={() => openInvitation("manual")} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-24 w-24 px-0 py-0 md:h-28 md:w-28 ${stage === "opening" ? "" : "seal-breathe"}`}>
             <span className="relative block h-full w-full">
               <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
-              <span className="absolute inset-x-0 bottom-0 translate-y-[5px] whitespace-nowrap text-center font-sans text-[7px] uppercase not-italic tracking-[.2em] md:text-[8px] md:tracking-[.25em]">Tap to enter our celebration</span>
+              <span className="absolute bottom-0 left-1/2 w-max -translate-x-1/2 translate-y-[8px] whitespace-nowrap text-center font-sans text-[7px] uppercase not-italic tracking-[.16em] md:text-[8px] md:tracking-[.22em]">Tap to enter our celebration</span>
             </span>
           </Button>
         </div>
