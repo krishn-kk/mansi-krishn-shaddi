@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CalendarPlus, Check, MapPin, Music, VolumeX } from "lucide-react";
 import heroImage from "@/assets/wedding-hero.jpg";
 import coverImage from "@/assets/wedding-gate-cinematic-v2.webp";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CeremonyTimeline, ceremonies } from "@/components/CeremonyTimeline";
 
 const WHATSAPP_NUMBER = "919583191615";
-const MUSIC_VIDEO_ID = "_BduB3uQciw";
+const MUSIC_SOURCE = "/kudmayi-wedding.mp3";
 
 const target = new Date("2026-11-22T11:00:00+05:30").getTime();
 const pad = (value: number) => String(Math.max(0, value)).padStart(2, "0");
@@ -49,99 +49,52 @@ function Countdown() {
   </div>;
 }
 
-type YTPlayer = {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  mute: () => void;
-  unMute: () => void;
-  setVolume: (volume: number) => void;
-  destroy: () => void;
-};
-
-let youTubeApiPromise: Promise<any> | null = null;
-function loadYouTubeApi() {
-  if (youTubeApiPromise) return youTubeApiPromise;
-  youTubeApiPromise = new Promise((resolve) => {
-    const existing = (window as any).YT;
-    if (existing?.Player) { resolve(existing); return; }
-    const previous = (window as any).onYouTubeIframeAPIReady;
-    (window as any).onYouTubeIframeAPIReady = () => { previous?.(); resolve((window as any).YT); };
-    const script = document.createElement("script");
-    script.src = "https://www.youtube.com/iframe_api";
-    script.async = true;
-    document.head.appendChild(script);
-  });
-  return youTubeApiPromise;
-}
-
 function MusicToggle() {
   const [playing, setPlaying] = useState(false);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YTPlayer | null>(null);
-  const audioRef = useRef<{ context: AudioContext; gain: GainNode } | null>(null);
+  const [showPlayPrompt, setShowPlayPrompt] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
-  const startFallbackAudio = () => {
-    const AudioCtx = window.AudioContext ?? window.webkitAudioContext;
-    if (!AudioCtx) return null;
-    const context = new AudioCtx();
-    const gain = context.createGain();
-    gain.gain.value = 0.025;
-    gain.connect(context.destination);
-    [196, 246.94, 293.66].forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      oscillator.type = "sine"; oscillator.frequency.value = frequency;
-      const voice = context.createGain(); voice.gain.value = 0.34 / (index + 1);
-      oscillator.connect(voice).connect(gain); oscillator.start();
-    });
-    return { context, gain };
-  };
-
-  const start = () => {
-    if (playerRef.current || audioRef.current) return;
-    void loadYouTubeApi().then((YT) => {
-      if (playerRef.current || audioRef.current) return;
-      if (!YT?.Player || !hostRef.current) { audioRef.current = startFallbackAudio(); setPlaying(true); return; }
-      playerRef.current = new YT.Player(hostRef.current, {
-        videoId: MUSIC_VIDEO_ID,
-        playerVars: { autoplay: 1, controls: 0, disablekb: 1, loop: 1, playlist: MUSIC_VIDEO_ID, playsinline: 1, iv_load_policy: 3, modestbranding: 1 },
-        events: {
-          onReady: (event: { target: YTPlayer }) => {
-            event.target.unMute();
-            event.target.setVolume(45);
-            event.target.playVideo();
-            setPlaying(true);
-          },
-          onError: () => { audioRef.current = startFallbackAudio(); setPlaying(true); },
-        },
+  const start = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.45;
+    const playback = audio.play();
+    if (playback) {
+      void playback.then(() => setShowPlayPrompt(false)).catch(() => {
+        setPlaying(false);
+        setShowPlayPrompt(true);
       });
-    });
-  };
-
-  const toggle = () => {
-    if (!playerRef.current && !audioRef.current) { start(); return; }
-    const next = !playing;
-    if (playerRef.current) {
-      if (next) { playerRef.current.unMute(); playerRef.current.playVideo(); }
-      else playerRef.current.mute();
-    } else if (audioRef.current) {
-      audioRef.current.gain.gain.setTargetAtTime(next ? 0.025 : 0, audioRef.current.context.currentTime, 0.2);
     }
-    setPlaying(next);
-  };
-
-  const startRef = useRef(start);
-  startRef.current = start;
-  useEffect(() => {
-    const beginMusic = () => startRef.current();
-    window.addEventListener("wedding-music-start", beginMusic);
-    return () => window.removeEventListener("wedding-music-start", beginMusic);
   }, []);
 
-  useEffect(() => () => { try { playerRef.current?.destroy(); } catch { /* player already gone */ } void audioRef.current?.context.close(); }, []);
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) start();
+    else audio.pause();
+  };
+
+  useEffect(() => {
+    const beginMusic = () => start();
+    window.addEventListener("wedding-music-start", beginMusic);
+    return () => window.removeEventListener("wedding-music-start", beginMusic);
+  }, [start]);
 
   return <>
-    <div ref={hostRef} aria-hidden="true" className="pointer-events-none fixed bottom-0 left-0 h-px w-px overflow-hidden opacity-0" />
-    <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label={playing ? "Mute the music" : "Play the music"} title={playing ? "Mute music" : "Play music"} className="fixed right-4 top-4 z-50 rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{playing ? <Music /> : <VolumeX />}</Button>
+    <audio
+      ref={audioRef}
+      src={MUSIC_SOURCE}
+      loop
+      preload="auto"
+      playsInline
+      onPlay={() => { setPlaying(true); setShowPlayPrompt(false); }}
+      onPause={() => setPlaying(false)}
+      onError={() => { setPlaying(false); setShowPlayPrompt(true); }}
+    />
+    <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
+      {showPlayPrompt && <button type="button" onClick={start} className="rounded-full border border-gold/45 bg-background/90 px-3 py-2 font-display text-sm text-maroon shadow-[var(--shadow-gold)] backdrop-blur-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">Tap to Play Music ♪</button>}
+      <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label={playing ? "Pause the music" : "Play the music"} title={playing ? "Pause music" : "Play music"} className="rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{playing ? <Music /> : <VolumeX />}</Button>
+    </div>
   </>;
 }
 
@@ -161,6 +114,10 @@ function downloadCalendar() {
 
 export function WeddingInvitation() {
   const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
+  const [entranceReady, setEntranceReady] = useState(false);
+  const entranceImageRef = useRef<HTMLImageElement>(null);
+  const openingStartedRef = useRef(false);
+  const autoOpenTimerRef = useRef<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const petals = useMemo(() => Array.from({ length: 10 }, (_, index) => ({ left: `${7 + index * 9}%`, delay: `${(index * 1.7) % 8}s`, duration: `${9 + (index % 4) * 2}s` })), []);
 
@@ -174,12 +131,32 @@ export function WeddingInvitation() {
     return () => { unlock(document.documentElement); unlock(document.body); };
   }, [stage]);
 
-  const openInvitation = () => {
-    if (stage !== "closed") return;
-    window.dispatchEvent(new Event("wedding-music-start"));
+  const openInvitation = useCallback((origin: "manual" | "automatic" = "manual") => {
+    if (openingStartedRef.current) return;
+    openingStartedRef.current = true;
+    if (autoOpenTimerRef.current !== null) {
+      window.clearTimeout(autoOpenTimerRef.current);
+      autoOpenTimerRef.current = null;
+    }
+    window.dispatchEvent(new CustomEvent("wedding-music-start", { detail: { origin } }));
     setStage("opening");
     window.setTimeout(() => setStage("open"), 2150);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (entranceImageRef.current?.complete) setEntranceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!entranceReady || openingStartedRef.current) return;
+    autoOpenTimerRef.current = window.setTimeout(() => openInvitation("automatic"), 1500);
+    return () => {
+      if (autoOpenTimerRef.current !== null) {
+        window.clearTimeout(autoOpenTimerRef.current);
+        autoOpenTimerRef.current = null;
+      }
+    };
+  }, [entranceReady, openInvitation]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -218,7 +195,7 @@ export function WeddingInvitation() {
     {stage !== "open" && <section aria-label="Closed wedding invitation" className={`cover-gate fixed inset-0 z-40 h-[100dvh] w-screen overflow-hidden bg-maroon text-primary-foreground ${stage === "opening" ? "cover-out" : ""}`}>
       <div className="absolute inset-0 grid grid-cols-2">
         <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-left" : ""}`}>
-          <picture className="contents"><source media="(max-width: 767px)" srcSet={coverImageMobile} /><img src={coverImage} alt="" width={1920} height={1080} className="gate-image absolute left-0 top-0 h-full w-[200%] max-w-none object-cover" /></picture>
+          <picture className="contents"><source media="(max-width: 767px)" srcSet={coverImageMobile} /><img ref={entranceImageRef} src={coverImage} alt="" width={1920} height={1080} onLoad={() => setEntranceReady(true)} className="gate-image absolute left-0 top-0 h-full w-[200%] max-w-none object-cover" /></picture>
         </div>
         <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-right" : ""}`}>
           <picture className="contents"><source media="(max-width: 767px)" srcSet={coverImageMobile} /><img src={coverImage} alt="" width={1920} height={1080} className="gate-image absolute right-0 top-0 h-full w-[200%] max-w-none object-cover" /></picture>
@@ -232,7 +209,7 @@ export function WeddingInvitation() {
         <p className="text-[9px] uppercase tracking-[.3em] text-primary-foreground/80 md:text-[10px] md:tracking-[.35em]">A wedding invitation</p>
         <h1 className="mt-4 whitespace-nowrap font-display text-[2.65rem] leading-none sm:text-5xl md:mt-6 md:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
         <div className="mt-6 md:mt-9">
-          <Button type="button" variant="seal" onClick={openInvitation} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-24 w-24 px-0 py-0 md:h-28 md:w-28 ${stage === "opening" ? "" : "seal-breathe"}`}>
+          <Button type="button" variant="seal" onClick={() => openInvitation("manual")} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-24 w-24 px-0 py-0 md:h-28 md:w-28 ${stage === "opening" ? "" : "seal-breathe"}`}>
             <span className="relative block h-full w-full">
               <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
               <span className="absolute inset-x-0 bottom-0 translate-y-[5px] whitespace-nowrap text-center font-sans text-[7px] uppercase not-italic tracking-[.2em] md:text-[8px] md:tracking-[.25em]">Enter our celebration</span>
@@ -312,5 +289,3 @@ export function WeddingInvitation() {
     <footer className="invitation-footer relative flex flex-col items-center justify-center overflow-hidden border-x border-b border-gold/40 bg-maroon px-6 py-5 text-center text-primary-foreground md:py-6"><Monogram small /><p className="mt-2 font-display text-xl italic md:text-2xl">With love, laughter, and our whole hearts.</p><p className="mt-1 text-[9px] uppercase tracking-[.28em] text-primary-foreground/65">Krishn & Mansi · November 2026</p></footer>
   </main>;
 }
-
-declare global { interface Window { webkitAudioContext?: typeof AudioContext } }
