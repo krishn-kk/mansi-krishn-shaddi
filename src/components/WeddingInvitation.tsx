@@ -98,7 +98,7 @@ function MusicToggle() {
   </>;
 }
 
-function downloadCalendar() {
+function createCalendarFile() {
   const entries: [string, string, string, string][] = [
     ["20261122T053000Z", "20261122T073000Z", "Haldi — Krishn & Mansi", "Home, Workshop colony"],
     ["20261123T033000Z", "20261123T053000Z", "Matkor & Rasam — Krishn & Mansi", "Home, Workshop colony"],
@@ -106,10 +106,25 @@ function downloadCalendar() {
     ["20261126T133000Z", "20261126T153000Z", "Reception — Krishn & Mansi", "Home, Workshop colony"],
   ];
   const escapeIcs = (value: string) => value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-  const events = entries.map(([start, end, summary, location]) => `BEGIN:VEVENT\nDTSTART:${start}\nDTEND:${end}\nSUMMARY:${escapeIcs(summary)}\nLOCATION:${escapeIcs(location)}\nEND:VEVENT`).join("\n");
-  const file = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Krishn and Mansi//Wedding//EN\n${events}\nEND:VCALENDAR`;
-  const url = URL.createObjectURL(new Blob([file], { type: "text/calendar" }));
-  const link = document.createElement("a"); link.href = url; link.download = "krishn-mansi-wedding.ics"; link.click(); URL.revokeObjectURL(url);
+  const events = entries.map(([start, end, summary, location], index) => `BEGIN:VEVENT\r\nUID:krishn-mansi-${index + 1}-2026@wedding-invitation\r\nDTSTAMP:20261031T000000Z\r\nDTSTART:${start}\r\nDTEND:${end}\r\nSUMMARY:${escapeIcs(summary)}\r\nLOCATION:${escapeIcs(location)}\r\nEND:VEVENT`).join("\r\n");
+  return `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nPRODID:-//Krishn and Mansi//Wedding//EN\r\n${events}\r\nEND:VCALENDAR\r\n`;
+}
+
+function openCalendar() {
+  const file = createCalendarFile();
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  if (isMobile) {
+    window.location.assign("/krishn-mansi-wedding.ics");
+    return;
+  }
+
+  const url = URL.createObjectURL(new Blob([file], { type: "text/calendar;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "krishn-mansi-wedding.ics";
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function WeddingInvitation() {
@@ -258,7 +273,7 @@ export function WeddingInvitation() {
     <section id="save-the-date" className="countdown-section relative overflow-hidden border-x border-b border-gold/40 bg-ivory-deep/30 px-4 py-6 text-center md:py-8">
       <div className="mx-auto mb-3 flex max-w-xl items-center gap-3"><span className="h-px flex-1 bg-gold/45" /><h2 className="whitespace-nowrap font-display text-lg font-semibold uppercase tracking-[.16em] text-maroon md:text-2xl">Save the date</h2><span className="h-px flex-1 bg-gold/45" /></div>
       <Countdown />
-      <Button variant="invitation" size="sm" onClick={downloadCalendar} className="mt-3 px-5 md:px-8"><CalendarPlus /> Add all events to calendar</Button>
+      <Button variant="invitation" size="sm" onClick={openCalendar} className="mt-3 px-5 md:px-8"><CalendarPlus /> Add all events to calendar</Button>
     </section>
 
     <CeremonyTimeline />
