@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CalendarPlus, Check, MapPin, Music, VolumeX } from "lucide-react";
 import heroImage from "@/assets/wedding-hero.jpg";
-import coverImage from "@/assets/wedding-cover.jpg";
-import galleryImage1 from "@/assets/wedding-gallery-01.jpeg.asset.json";
-import galleryImage2 from "@/assets/wedding-gallery-02.jpeg.asset.json";
-import galleryImage3 from "@/assets/wedding-gallery-03.jpeg.asset.json";
-import galleryImage4 from "@/assets/wedding-gallery-04.jpeg.asset.json";
-import galleryImage5 from "@/assets/wedding-gallery-05.jpeg.asset.json";
+import coverImage from "@/assets/wedding-gate-cinematic-v2.webp";
+import coverImageMobile from "@/assets/wedding-gate-mobile-v1.webp";
+import storyPalace from "@/assets/story-palace.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,16 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CeremonyTimeline, ceremonies } from "@/components/CeremonyTimeline";
 
-const galleryImages = [
-  { src: galleryImage1.url, alt: "Krishn and Mansi together beneath a floral arch" },
-  { src: galleryImage2.url, alt: "Krishn and Mansi sharing a joyful moment at their celebration" },
-  { src: galleryImage3.url, alt: "Krishn and Mansi standing together at a celebration" },
-  { src: galleryImage4.url, alt: "Krishn and Mansi celebrating together beneath the lights" },
-  { src: galleryImage5.url, alt: "Krishn and Mansi sharing a dance" },
-];
-
 const WHATSAPP_NUMBER = "919583191615";
-const MUSIC_VIDEO_ID = "_BduB3uQciw";
+const MUSIC_SOURCE = "/kudmayi-wedding.mp3";
 
 const target = new Date("2026-11-22T11:00:00+05:30").getTime();
 const pad = (value: number) => String(Math.max(0, value)).padStart(2, "0");
@@ -33,8 +22,12 @@ function useCountdown() {
     const distance = Math.max(0, target - Date.now());
     return { days: Math.floor(distance / 86400000), hours: Math.floor(distance / 3600000) % 24, minutes: Math.floor(distance / 60000) % 60, seconds: Math.floor(distance / 1000) % 60 };
   };
-  const [countdown, setCountdown] = useState(calculate);
-  useEffect(() => { const id = window.setInterval(() => setCountdown(calculate()), 1000); return () => window.clearInterval(id); }, []);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  useEffect(() => {
+    setCountdown(calculate());
+    const id = window.setInterval(() => setCountdown(calculate()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
   return countdown;
 }
 
@@ -48,195 +41,100 @@ function WhatsAppIcon({ className = "" }: { className?: string }) {
 
 function Countdown() {
   const count = useCountdown();
-  return <div className="mx-auto grid max-w-3xl grid-cols-4 border-y border-gold/35 py-6 md:py-10">
+  return <div className="mx-auto grid max-w-2xl grid-cols-4 border-y border-gold/35 py-3 md:py-4">
     {Object.entries(count).map(([label, value]) => <div className="border-r border-gold/30 px-1 text-center last:border-r-0" key={label}>
-      <span key={value} className="digit-change block font-display text-4xl text-maroon tabular-nums sm:text-6xl md:text-7xl">{label === "days" ? value : pad(value)}</span>
-      <span className="mt-2 block text-[9px] uppercase text-muted-foreground sm:text-xs">{label}</span>
+      <span key={value} className="digit-change block font-display text-3xl text-maroon tabular-nums sm:text-4xl md:text-5xl">{label === "days" ? value : pad(value)}</span>
+      <span className="mt-0.5 block font-display text-[9px] capitalize text-muted-foreground sm:text-xs">{label}</span>
     </div>)}
   </div>;
 }
 
-type YTPlayer = {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  mute: () => void;
-  unMute: () => void;
-  setVolume: (volume: number) => void;
-  destroy: () => void;
-};
-
-let youTubeApiPromise: Promise<any> | null = null;
-function loadYouTubeApi() {
-  if (youTubeApiPromise) return youTubeApiPromise;
-  youTubeApiPromise = new Promise((resolve) => {
-    const existing = (window as any).YT;
-    if (existing?.Player) { resolve(existing); return; }
-    const previous = (window as any).onYouTubeIframeAPIReady;
-    (window as any).onYouTubeIframeAPIReady = () => { previous?.(); resolve((window as any).YT); };
-    const script = document.createElement("script");
-    script.src = "https://www.youtube.com/iframe_api";
-    script.async = true;
-    document.head.appendChild(script);
-  });
-  return youTubeApiPromise;
-}
-
-type MusicController = {
-  playing: boolean;
-  blocked: boolean;
-  hostRef: React.RefObject<HTMLDivElement | null>;
-  start: () => void;
-  attempt: () => void;
-  toggle: () => void;
-};
-
-function useMusicController(): MusicController {
+function MusicToggle() {
   const [playing, setPlaying] = useState(false);
-  const [blocked, setBlocked] = useState(false);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YTPlayer | null>(null);
-  const audioRef = useRef<{ context: AudioContext; gain: GainNode } | null>(null);
-  const playingRef = useRef(false);
+  const [showPlayPrompt, setShowPlayPrompt] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
-  const setPlayingState = (value: boolean) => {
-    playingRef.current = value;
-    setPlaying(value);
-  };
-
-  const startFallbackAudio = () => {
-    const AudioCtx = window.AudioContext ?? window.webkitAudioContext;
-    if (!AudioCtx) return null;
-    const context = new AudioCtx();
-    const gain = context.createGain();
-    gain.gain.value = 0.025;
-    gain.connect(context.destination);
-    [196, 246.94, 293.66].forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      oscillator.type = "sine"; oscillator.frequency.value = frequency;
-      const voice = context.createGain(); voice.gain.value = 0.34 / (index + 1);
-      oscillator.connect(voice).connect(gain); oscillator.start();
-    });
-    return { context, gain };
-  };
-
-  const startWithFallback = () => {
-    if (audioRef.current) { void audioRef.current.context.resume().catch(() => {}); return; }
-    const fallback = startFallbackAudio();
-    if (!fallback) { setBlocked(true); return; }
-    audioRef.current = fallback;
-    void fallback.context.resume()
-      .then(() => setPlayingState(true))
-      .catch(() => setBlocked(true));
-    window.setTimeout(() => {
-      if (audioRef.current && audioRef.current.context.state !== "running") setBlocked(true);
-    }, 1200);
-  };
-
-  const start = () => {
-    if (playerRef.current || audioRef.current) { if (audioRef.current) startWithFallback(); return; }
-    setBlocked(false);
-    void loadYouTubeApi().then((YT) => {
-      if (playerRef.current || audioRef.current) { if (audioRef.current) startWithFallback(); return; }
-      if (!YT?.Player || !hostRef.current) { startWithFallback(); return; }
-      try {
-        playerRef.current = new YT.Player(hostRef.current, {
-          videoId: MUSIC_VIDEO_ID,
-          playerVars: { autoplay: 1, controls: 0, disablekb: 1, loop: 1, playlist: MUSIC_VIDEO_ID, playsinline: 1, iv_load_policy: 3, modestbranding: 1 },
-          events: {
-            onReady: (event: { target: YTPlayer }) => {
-              try {
-                event.target.unMute();
-                event.target.setVolume(45);
-                event.target.playVideo();
-              } catch { /* playback refused by the browser */ }
-              window.setTimeout(() => {
-                if (!playingRef.current && !audioRef.current) setBlocked(true);
-              }, 3000);
-            },
-            onStateChange: (event: { data: number; target: YTPlayer }) => {
-              if (event.data === 1) setPlayingState(true);
-            },
-            onError: () => { startWithFallback(); },
-          },
-        });
-      } catch { startWithFallback(); }
-    });
-  };
-
-  const attempt = () => {
-    start();
-    window.setTimeout(() => { if (!playingRef.current) setBlocked(true); }, 4000);
-  };
-
-  const toggle = () => {
-    if (!playerRef.current && !audioRef.current) { start(); return; }
-    const next = !playingRef.current;
-    setBlocked(false);
-    if (playerRef.current) {
-      try {
-        if (next) { playerRef.current.unMute(); playerRef.current.playVideo(); }
-        else playerRef.current.pauseVideo();
-      } catch { /* player not ready yet */ }
-    } else if (audioRef.current) {
-      if (next) void audioRef.current.context.resume().then(() => setPlayingState(true)).catch(() => setBlocked(true));
-      else void audioRef.current.context.suspend().then(() => setPlayingState(false));
+  const start = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.45;
+    const playback = audio.play();
+    if (playback) {
+      void playback.then(() => setShowPlayPrompt(false)).catch(() => {
+        setPlaying(false);
+        setShowPlayPrompt(true);
+      });
     }
-    setPlayingState(next);
-  };
-
-  useEffect(() => () => {
-    try { playerRef.current?.destroy(); } catch { /* player already gone */ }
-    void audioRef.current?.context.close();
   }, []);
 
-  return { playing, blocked, hostRef, start, attempt, toggle };
-}
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) start();
+    else audio.pause();
+  };
 
-function MusicToggle({ music }: { music: MusicController }) {
+  useEffect(() => {
+    const beginMusic = () => start();
+    window.addEventListener("wedding-music-start", beginMusic);
+    return () => window.removeEventListener("wedding-music-start", beginMusic);
+  }, [start]);
+
   return <>
-    <div ref={music.hostRef} aria-hidden="true" className="pointer-events-none fixed bottom-0 left-0 h-px w-px overflow-hidden opacity-0" />
-    {music.blocked && !music.playing && (
-      <button type="button" onClick={music.toggle} className="fixed right-16 top-4 z-50 rounded-full border border-gold/50 bg-background/80 px-3 py-2 text-[9px] uppercase tracking-[.2em] text-maroon backdrop-blur-md transition-colors duration-300 hover:bg-background" aria-label="Play the music">Tap to play music ♪</button>
-    )}
-    <Button type="button" variant="outline" size="icon" onClick={music.toggle} aria-label={music.playing ? "Pause the music" : "Play the music"} title={music.playing ? "Pause music" : "Play music"} className="fixed right-4 top-4 z-50 rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{music.playing ? <Music /> : <VolumeX />}</Button>
+    <audio
+      ref={audioRef}
+      src={MUSIC_SOURCE}
+      loop
+      preload="auto"
+      playsInline
+      onPlay={() => { setPlaying(true); setShowPlayPrompt(false); }}
+      onPause={() => setPlaying(false)}
+      onError={() => { setPlaying(false); setShowPlayPrompt(true); }}
+    />
+    <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
+      {showPlayPrompt && <button type="button" onClick={start} className="rounded-full border border-gold/45 bg-background/90 px-3 py-2 font-display text-sm text-maroon shadow-[var(--shadow-gold)] backdrop-blur-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">Tap to Play Music ♪</button>}
+      <Button type="button" variant="outline" size="icon" onClick={toggle} aria-label={playing ? "Pause the music" : "Play the music"} title={playing ? "Pause music" : "Play music"} className="rounded-full border-gold/50 bg-background/80 backdrop-blur-md">{playing ? <Music /> : <VolumeX />}</Button>
+    </div>
   </>;
 }
 
-function downloadCalendar() {
+function createCalendarFile() {
   const entries: [string, string, string, string][] = [
     ["20261122T053000Z", "20261122T073000Z", "Haldi — Krishn & Mansi", "Home, Workshop colony"],
     ["20261123T033000Z", "20261123T053000Z", "Matkor & Rasam — Krishn & Mansi", "Home, Workshop colony"],
     ["20261124T023000Z", "20261124T073000Z", "Barat & Shaadi — Krishn & Mansi", "Celebration Point Community Hall, Patna, Bihar"],
-    ["20261126T123000Z", "20261126T153000Z", "Reception — Krishn & Mansi", "Home, Workshop colony"],
+    ["20261126T133000Z", "20261126T153000Z", "Reception — Krishn & Mansi", "Home, Workshop colony"],
   ];
   const escapeIcs = (value: string) => value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-  const events = entries.map(([start, end, summary, location]) => `BEGIN:VEVENT\nDTSTART:${start}\nDTEND:${end}\nSUMMARY:${escapeIcs(summary)}\nLOCATION:${escapeIcs(location)}\nEND:VEVENT`).join("\n");
-  const file = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Krishn and Mansi//Wedding//EN\n${events}\nEND:VCALENDAR`;
-  const url = URL.createObjectURL(new Blob([file], { type: "text/calendar" }));
-  const link = document.createElement("a"); link.href = url; link.download = "krishn-mansi-wedding.ics"; link.click(); URL.revokeObjectURL(url);
+  const events = entries.map(([start, end, summary, location], index) => `BEGIN:VEVENT\r\nUID:krishn-mansi-${index + 1}-2026@wedding-invitation\r\nDTSTAMP:20261031T000000Z\r\nDTSTART:${start}\r\nDTEND:${end}\r\nSUMMARY:${escapeIcs(summary)}\r\nLOCATION:${escapeIcs(location)}\r\nEND:VEVENT`).join("\r\n");
+  return `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nPRODID:-//Krishn and Mansi//Wedding//EN\r\n${events}\r\nEND:VCALENDAR\r\n`;
+}
+
+function openCalendar() {
+  const file = createCalendarFile();
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  if (isMobile) {
+    window.location.assign("/krishn-mansi-wedding.ics");
+    return;
+  }
+
+  const url = URL.createObjectURL(new Blob([file], { type: "text/calendar;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "krishn-mansi-wedding.ics";
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function WeddingInvitation() {
   const [stage, setStage] = useState<"closed" | "opening" | "open">("closed");
-  const music = useMusicController();
+  const [entranceReady, setEntranceReady] = useState(false);
+  const entranceImageRef = useRef<HTMLImageElement>(null);
+  const openingStartedRef = useRef(false);
+  const autoOpenTimerRef = useRef<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const petals = useMemo(() => Array.from({ length: 10 }, (_, index) => ({ left: `${7 + index * 9}%`, delay: `${(index * 1.7) % 8}s`, duration: `${9 + (index % 4) * 2}s` })), []);
-
-  const openInvitation = (auto = false) => {
-    if (stage !== "closed") return;
-    if (auto) music.attempt(); else music.start();
-    setStage("opening");
-    window.setTimeout(() => setStage("open"), 2150);
-  };
-
-  const openRef = useRef(openInvitation);
-  openRef.current = openInvitation;
-
-  useEffect(() => {
-    if (stage !== "closed") return;
-    const id = window.setTimeout(() => openRef.current(true), 1500);
-    return () => window.clearTimeout(id);
-  }, [stage]);
 
   const [rsvpError, setRsvpError] = useState<string | null>(null);
 
@@ -247,6 +145,33 @@ export function WeddingInvitation() {
     lock(document.documentElement); lock(document.body);
     return () => { unlock(document.documentElement); unlock(document.body); };
   }, [stage]);
+
+  const openInvitation = useCallback((origin: "manual" | "automatic" = "manual") => {
+    if (openingStartedRef.current) return;
+    openingStartedRef.current = true;
+    if (autoOpenTimerRef.current !== null) {
+      window.clearTimeout(autoOpenTimerRef.current);
+      autoOpenTimerRef.current = null;
+    }
+    window.dispatchEvent(new CustomEvent("wedding-music-start", { detail: { origin } }));
+    setStage("opening");
+    window.setTimeout(() => setStage("open"), 2150);
+  }, []);
+
+  useEffect(() => {
+    if (entranceImageRef.current?.complete) setEntranceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!entranceReady || openingStartedRef.current) return;
+    autoOpenTimerRef.current = window.setTimeout(() => openInvitation("automatic"), 3000);
+    return () => {
+      if (autoOpenTimerRef.current !== null) {
+        window.clearTimeout(autoOpenTimerRef.current);
+        autoOpenTimerRef.current = null;
+      }
+    };
+  }, [entranceReady, openInvitation]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -280,105 +205,102 @@ export function WeddingInvitation() {
     setSubmitted(true);
   };
 
-  return <main className="bg-background text-foreground">
-    <MusicToggle music={music} />
-    {stage !== "open" && <section aria-label="Closed wedding invitation" className={`fixed inset-0 z-40 overflow-hidden bg-maroon text-primary-foreground ${stage === "opening" ? "cover-out" : ""}`}>
+  return <main className="invitation-page bg-background text-foreground">
+    <MusicToggle />
+    {stage !== "open" && <section aria-label="Closed wedding invitation" className={`cover-gate fixed inset-0 z-40 h-[100dvh] w-screen overflow-hidden bg-maroon text-primary-foreground ${stage === "opening" ? "cover-out" : ""}`}>
       <div className="absolute inset-0 grid grid-cols-2">
         <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-left" : ""}`}>
-          <img src={coverImage} alt="" width={1024} height={1536} className="absolute left-0 top-0 h-full w-[200%] max-w-none object-cover" />
+          <picture className="contents"><source media="(max-width: 767px)" srcSet={coverImageMobile} /><img ref={entranceImageRef} src={coverImage} alt="" width={1920} height={1080} onLoad={() => setEntranceReady(true)} className="gate-image absolute left-0 top-0 h-full w-[200%] max-w-none object-cover" /></picture>
         </div>
         <div aria-hidden="true" className={`relative overflow-hidden ${stage === "opening" ? "door-right" : ""}`}>
-          <img src={coverImage} alt="" width={1024} height={1536} className="absolute right-0 top-0 h-full w-[200%] max-w-none object-cover" />
+          <picture className="contents"><source media="(max-width: 767px)" srcSet={coverImageMobile} /><img src={coverImage} alt="" width={1920} height={1080} className="gate-image absolute right-0 top-0 h-full w-[200%] max-w-none object-cover" /></picture>
         </div>
       </div>
+      <div aria-hidden="true" className="cover-vignette pointer-events-none absolute inset-0" />
+      <div aria-hidden="true" className="cover-frame pointer-events-none absolute inset-0 z-[2]"><span className="absolute inset-[10px] border border-gold/80 md:inset-[18px]" /><span className="absolute inset-[15px] border border-gold/25 md:inset-[23px]" /></div>
       <div aria-hidden="true" className={`pointer-events-none absolute inset-0 opacity-0 ${stage === "opening" ? "golden-backdrop" : ""}`} style={{ background: "radial-gradient(ellipse 60% 70% at 50% 52%, color-mix(in oklab, var(--haldi) 60%, white), var(--gold) 45%, color-mix(in oklab, var(--gold) 55%, var(--maroon)) 75%, transparent)" }} />
       <div aria-hidden="true" className={`pointer-events-none absolute left-1/2 top-1/2 z-10 h-[70vmax] w-[70vmax] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0 ${stage === "opening" ? "golden-flare" : ""}`} style={{ background: "radial-gradient(closest-side, color-mix(in oklab, var(--haldi) 65%, white), var(--gold) 42%, transparent 72%)" }} />
-      <div className={`absolute inset-0 flex flex-col items-center justify-center px-6 text-center ${stage === "opening" ? "cover-content-fade" : "invitation-enter"}`}>
-        <p className="text-[10px] uppercase tracking-[.35em] text-primary-foreground/80">A wedding invitation</p>
-        <h1 className="mt-6 font-display text-5xl leading-tight sm:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
-        <div className="mt-9">
-          <Button type="button" variant="seal" onClick={() => openInvitation(false)} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-28 w-28 px-0 py-0 ${stage === "opening" ? "" : "seal-breathe"}`}>
+      <div className={`cover-content absolute inset-0 flex flex-col items-center justify-center px-5 pb-[12dvh] text-center md:pb-0 ${stage === "opening" ? "cover-content-fade" : "invitation-enter"}`}>
+        <p className="text-[9px] uppercase tracking-[.3em] text-primary-foreground/80 md:text-[10px] md:tracking-[.35em]">A wedding invitation</p>
+        <h1 className="mt-4 whitespace-nowrap font-display text-[2.65rem] leading-none sm:text-5xl md:mt-6 md:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
+        <div className="mt-6 flex flex-col items-center md:mt-9">
+          <Button type="button" variant="seal" onClick={() => openInvitation("manual")} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-24 w-24 px-0 py-0 md:h-28 md:w-28 ${stage === "opening" ? "" : "seal-breathe"}`}>
             <span className="relative block h-full w-full">
               <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
-              <span className="absolute inset-x-0 bottom-0 translate-y-[5px] text-center font-sans text-[8px] uppercase not-italic tracking-[.25em]">Enter our celebration</span>
             </span>
           </Button>
+          <p className="mt-2 whitespace-nowrap text-center font-sans text-[7px] uppercase tracking-[.16em] text-primary-foreground md:text-[8px] md:tracking-[.22em]">Tap to enter our celebration</p>
         </div>
-        <p className="mt-9 font-display text-xl italic text-primary-foreground/75">Begin our forever</p>
+        <p className="mt-6 font-display text-xl italic text-primary-foreground/80 md:mt-9">Begin our forever</p>
+        <p className="mt-4 text-[9px] uppercase tracking-[.25em] text-primary-foreground/65 md:mt-8 md:tracking-[.28em]">22—26 November 2026</p>
       </div>
     </section>}
 
-    <section className="relative flex min-h-[92dvh] items-center justify-center overflow-hidden px-6 py-24 text-center">
+    <section className="invitation-hero relative flex h-80 items-center justify-center overflow-hidden border-x border-t border-gold/40 px-6 py-6 text-center md:py-8">
       {/* Replace this imported image with {{COUPLE_PHOTO}} when available. */}
       <img data-placeholder-token="{{COUPLE_PHOTO}}" src={heroImage} alt="Placeholder for Krishn and Mansi's couple portrait" width={1280} height={1600} className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-0 bg-background/45" />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-transparent to-background" />
+      <div className="absolute inset-0 bg-background/55" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-transparent to-background" />
+      <div aria-hidden="true" className="silk-sheen absolute inset-0" />
       {petals.map((petal, index) => <span aria-hidden="true" key={index} className="petal-fall absolute -top-6 h-3 w-2 rounded-[70%_30%] bg-maroon/40" style={{ left: petal.left, animationDelay: petal.delay, ["--petal-duration" as string]: petal.duration }} />)}
       <div className="relative z-10 flex max-w-4xl flex-col items-center invitation-enter">
-        <Monogram />
-        <p className="mt-8 text-[10px] uppercase text-maroon">Together with their families</p>
-        <h2 className="mt-3 font-display text-6xl leading-[.86] text-maroon sm:text-8xl md:text-[8rem]">Krishn <span className="block text-4xl italic text-gold sm:text-6xl">&</span> Mansi</h2>
-        <p className="mt-7 font-display text-2xl italic sm:text-3xl">Four days. One forever.</p>
-        <p className="mt-4 text-xs uppercase text-muted-foreground">22—26 November 2026</p>
-        <a href="#story" className="mt-14 border-b border-gold pb-2 text-[10px] uppercase text-maroon">Discover our celebration</a>
+        <Monogram small />
+        <p className="mt-3 text-[9px] text-maroon sm:text-[10px]">Together with their families</p>
+        <h2 className="mt-1 whitespace-nowrap font-display text-[clamp(2.6rem,11vw,4.5rem)] leading-none text-maroon md:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h2>
+        <p className="mt-2 font-display text-lg italic sm:text-2xl">Four days. One forever.</p>
+        <p className="mt-1.5 font-display text-sm tracking-[.12em] text-muted-foreground sm:text-base">22 — 26 November 2026</p>
+        <a href="#story" aria-label="Continue to our story" className="mt-3 font-display text-xl leading-none text-gold">⌄</a>
       </div>
     </section>
 
-    <section id="story" className="px-6 py-24 md:py-36">
-      <div className="mx-auto grid max-w-5xl gap-10 md:grid-cols-[1fr_1.5fr] md:gap-20">
-        <div><p className="text-[10px] uppercase text-gold">Our story</p><h2 className="mt-4 font-display text-5xl text-maroon md:text-6xl">Written in the stars,<br /><em>celebrated with you.</em></h2></div>
-        <div className="border-l border-gold/50 pl-7 font-display text-xl leading-relaxed text-muted-foreground md:text-2xl">
-          <p>Some stories begin with a grand moment. Ours grew quietly—in shared laughter, familiar silences, and the comforting discovery of home in one another.</p>
-          <p className="mt-6">Now, surrounded by the people who shaped our worlds, we begin our most beautiful chapter. Your presence will make these days part of our forever.</p>
+    <section id="story" className="story-section relative overflow-hidden border-x border-gold/40 px-5 py-5 md:px-10 md:py-7">
+      <div className="story-layout mx-auto grid max-w-6xl grid-cols-[.9fr_1.1fr] items-center gap-4 md:grid-cols-[1fr_1.15fr] md:gap-14">
+        <div>
+          <div className="flex items-center gap-3"><span className="h-px w-12 bg-gold/50" /><p className="text-[9px] uppercase tracking-[.18em] text-gold">Our story</p><span className="h-px flex-1 bg-gold/50" /></div>
+          <h2 className="mt-2 font-display text-[clamp(1.65rem,7vw,2.4rem)] font-semibold leading-[.92] text-maroon md:text-5xl">Written in the stars,<br />celebrated with you.</h2>
+          <div className="mt-4 hidden font-display text-sm leading-snug text-muted-foreground md:block lg:text-base">
+            <p>Some stories begin with a grand moment. Ours grew quietly—in shared laughter, familiar silences, and the comforting discovery of home in one another.</p>
+            <p className="mt-2">Now, surrounded by the people who shaped our worlds, we begin our most beautiful chapter. Your presence will make these days part of our forever.</p>
+          </div>
         </div>
+        <figure className="story-art">
+          <img src={storyPalace} alt="Illustrated Rajwada palace framed by jasmine and peacocks" width={1536} height={1024} loading="lazy" className="mx-auto max-h-56 w-full object-contain md:max-h-64" />
+        </figure>
       </div>
+      <a href="#save-the-date" aria-label="Continue to save the date" className="mx-auto mt-1 block w-fit font-display text-xl leading-none text-gold">⌄</a>
     </section>
 
-    <section className="bg-ivory-deep/55 px-4 py-24 text-center md:py-32">
-      <p className="text-[10px] uppercase text-gold">Until the story begins</p>
-      <h2 className="mb-12 mt-4 font-display text-5xl text-maroon md:text-7xl">Save the date</h2>
+    <section id="save-the-date" className="countdown-section relative overflow-hidden border-x border-b border-gold/40 bg-ivory-deep/30 px-4 py-6 text-center md:py-8">
+      <div className="mx-auto mb-3 flex max-w-xl items-center gap-3"><span className="h-px flex-1 bg-gold/45" /><h2 className="whitespace-nowrap font-display text-lg font-semibold uppercase tracking-[.16em] text-maroon md:text-2xl">Save the date</h2><span className="h-px flex-1 bg-gold/45" /></div>
       <Countdown />
-      <Button variant="invitation" size="lg" onClick={downloadCalendar} className="mt-10"><CalendarPlus /> Add all events to calendar</Button>
+      <Button variant="invitation" size="sm" onClick={openCalendar} className="mt-3 px-5 md:px-8"><CalendarPlus /> Add all events to calendar</Button>
     </section>
 
     <CeremonyTimeline />
 
-    <section className="bg-maroon px-5 py-24 text-primary-foreground md:py-32">
-      <div className="mx-auto max-w-6xl"><div className="mb-12 md:flex md:items-end md:justify-between"><div><p className="text-[10px] uppercase text-gold">Moments</p><h2 className="mt-3 font-display text-5xl md:text-7xl">A few pages before forever</h2></div><p className="mt-4 max-w-xs text-sm text-primary-foreground/65">A handful of moments, held close.</p></div>
-        <div className="grid auto-rows-[12rem] grid-cols-2 gap-3 md:auto-rows-[14rem] md:grid-cols-4 md:gap-5">
-          {galleryImages.map((image, index) => <figure key={image.src} className={`group relative min-h-0 overflow-hidden ${index === 0 ? "row-span-2" : ""} ${index === 1 || index === 4 ? "md:col-span-2" : ""}`}>
-            <img src={image.src} alt={image.alt} width={1280} height={1600} loading="lazy" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-          </figure>)}
+    <section className="rsvp-section relative overflow-hidden border-x border-t border-gold/40 px-5 py-7 md:px-10 md:py-9"><div className="mx-auto max-w-5xl">
+      <div className="mb-5 flex items-center gap-3"><span className="h-px flex-1 bg-gold/45" /><h2 className="whitespace-nowrap font-display text-3xl font-semibold text-maroon md:text-4xl">Will you join us?</h2><span className="h-px flex-1 bg-gold/45" /></div>
+      {submitted ? <div className="invitation-enter flex min-h-64 flex-col items-center justify-center border-y border-gold/40 text-center"><span className="grid h-12 w-12 place-items-center rounded-full bg-maroon text-primary-foreground"><Check /></span><h3 className="mt-4 font-display text-3xl text-maroon">Your RSVP is ready on WhatsApp.</h3><p className="mt-2 text-sm text-muted-foreground">Just press send in the chat that opened — we can’t wait to celebrate with you.</p></div> : <form onSubmit={submit} className="rsvp-form grid grid-cols-2 gap-x-3 gap-y-3 border-y border-gold/35 px-3 py-4 md:gap-x-7 md:gap-y-4 md:px-6 md:py-5" noValidate>
+        <label className="block font-display text-sm font-semibold">Your name<Input required name="name" className="mt-1 h-9 bg-background/65" placeholder="Your name" /></label>
+        <label className="block font-display text-sm font-semibold">Number of guests<Input required name="guests" type="number" min="1" max="10" defaultValue="1" className="mt-1 h-9 bg-background/65" /></label>
+        <fieldset className="col-span-2"><legend className="mb-2 font-display text-sm font-semibold">Which event(s) will you attend?</legend><div className="grid grid-cols-4 gap-2">{ceremonies.map((event) => <label key={event.name} className="flex items-center gap-1 text-[9px] leading-tight sm:gap-2 sm:text-sm"><Checkbox name="ceremonies" value={event.name} />{event.name}</label>)}</div></fieldset>
+        <label className="col-span-2 block font-display text-sm font-semibold">A note for us <span className="font-normal text-muted-foreground">(optional)</span><Textarea name="message" className="mt-1 h-10 min-h-10 bg-background/65 py-2" placeholder="Your message…" /></label>
+        {rsvpError && <p role="alert" className="col-span-2 border border-terracotta/50 bg-terracotta/10 px-4 py-3 text-sm text-terracotta">{rsvpError}</p>}
+        <Button type="submit" variant="invitation" size="lg" className="col-span-2 min-h-11 w-full border border-gold/60 px-8 shadow-[var(--shadow-gold)] transition-all duration-300 hover:shadow-[0_18px_45px_color-mix(in_oklab,var(--gold)_45%,transparent)] active:scale-[.97]"><WhatsAppIcon className="h-4 w-4" /> Send RSVP on WhatsApp</Button>
+      </form>}
+    </div></section>
+
+    <section className="travel-section relative overflow-hidden border-x border-gold/40 bg-ivory-deep/30 px-5 py-5 md:px-10 md:py-6">
+      <img aria-hidden="true" src={storyPalace} alt="" className="pointer-events-none absolute bottom-0 right-0 h-full w-2/5 object-contain object-right-bottom opacity-[.12]" />
+      <div className="relative mx-auto max-w-5xl">
+        <div className="mx-auto mb-4 flex max-w-lg items-center gap-3"><span className="h-px flex-1 bg-gold/45" /><div className="text-center"><p className="text-[8px] uppercase tracking-[.2em] text-gold">Travel</p><h2 className="whitespace-nowrap font-display text-2xl font-semibold text-maroon md:text-3xl">For your journey</h2></div><span className="h-px flex-1 bg-gold/45" /></div>
+        <div className="grid grid-cols-[.9fr_1.1fr] items-center divide-x divide-gold/40">
+          <div className="pr-4"><h3 className="font-display text-2xl font-semibold text-maroon md:text-3xl">Travel & stay</h3><p className="mt-1 text-xs leading-snug text-muted-foreground md:text-sm">Travel and stay arrangements are provided for <span className="font-medium text-maroon">Baraat guests only</span>.</p></div>
+          <div className="flex items-start gap-2 pl-4"><MapPin className="mt-0.5 h-5 w-5 shrink-0 text-gold" /><div><p className="font-display text-lg font-semibold leading-none text-maroon md:text-xl">Celebration Point, Patna</p><p className="mt-1 text-xs text-muted-foreground">7:00 PM</p><a href="https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6" target="_blank" rel="noreferrer" className="mt-1 inline-flex border-b border-maroon/50 font-display text-xs font-semibold text-maroon">Get directions <span aria-hidden="true" className="ml-1">→</span></a></div></div>
         </div>
       </div>
     </section>
 
-    <section className="px-5 py-24 md:py-36"><div className="mx-auto grid max-w-5xl gap-16 md:grid-cols-[.8fr_1.2fr] md:gap-24">
-      <div><p className="text-[10px] uppercase text-gold">Kindly respond</p><h2 className="mt-4 font-display text-5xl text-maroon md:text-6xl">Will you join us?</h2><p className="mt-5 text-sm leading-relaxed text-muted-foreground">Your blessings are the greatest gift. Please let us know which moments we’ll share together.</p></div>
-      {submitted ? <div className="invitation-enter flex min-h-96 flex-col items-center justify-center border-y border-gold/40 text-center"><span className="grid h-14 w-14 place-items-center rounded-full bg-maroon text-primary-foreground"><Check /></span><h3 className="mt-6 font-display text-4xl text-maroon">Your RSVP is ready on WhatsApp.</h3><p className="mt-3 text-sm text-muted-foreground">Just press send in the chat that opened — we can’t wait to celebrate with you.</p></div> : <form onSubmit={submit} className="space-y-7" noValidate>
-        <label className="block text-xs uppercase">Your name<Input required name="name" className="mt-2 h-12 border-x-0 border-t-0 rounded-none px-0" placeholder="Full name" /></label>
-        <label className="block text-xs uppercase">Number of guests<Input required name="guests" type="number" min="1" max="10" defaultValue="1" className="mt-2 h-12 border-x-0 border-t-0 rounded-none px-0" /></label>
-        <fieldset><legend className="mb-4 text-xs uppercase">Celebrations you’ll attend</legend><div className="grid gap-4 sm:grid-cols-2">{ceremonies.map((event) => <label key={event.name} className="flex items-center gap-3 text-sm"><Checkbox name="ceremonies" value={event.name} />{event.name}</label>)}</div></fieldset>
-        <label className="block text-xs uppercase">A note for us <span className="normal-case text-muted-foreground">(optional)</span><Textarea name="message" className="mt-2 min-h-28 border-x-0 border-t-0 rounded-none px-0" placeholder="Write a little something…" /></label>
-        {rsvpError && <p role="alert" className="border border-terracotta/50 bg-terracotta/10 px-4 py-3 text-sm text-terracotta">{rsvpError}</p>}
-        <Button type="submit" variant="invitation" size="lg" className="border border-gold/60 px-8 shadow-[var(--shadow-gold)] transition-all duration-300 hover:shadow-[0_18px_45px_color-mix(in_oklab,var(--gold)_45%,transparent)] active:scale-[.97]"><WhatsAppIcon className="h-4 w-4" /> Send RSVP on WhatsApp</Button>
-      </form>}
-    </div></section>
-
-    <section className="bg-ivory-deep/50 px-5 py-24 md:py-32"><div className="mx-auto max-w-2xl text-center">
-      <p className="text-[10px] uppercase text-gold">For your journey</p>
-      <h2 className="mt-4 font-display text-4xl text-maroon md:text-5xl">Travel & stay</h2>
-      <div className="mt-10 border border-gold/35 bg-card/80 px-7 py-12 shadow-[var(--shadow-gold)]">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-gold/50 text-gold"><MapPin /></span>
-        <p className="mx-auto mt-7 max-w-sm text-sm leading-relaxed text-muted-foreground">Travel and stay arrangements are provided for <span className="font-medium text-maroon">Baraat guests only</span>. We look forward to welcoming you warmly.</p>
-        <p className="mt-9 font-display text-3xl text-maroon">Celebration Point, Patna</p>
-        <p className="mt-2 text-xs uppercase tracking-[.2em] text-muted-foreground">Time · 7:00 PM</p>
-        <Button asChild variant="outline" size="sm" className="mt-7 border-gold/50 bg-transparent"><a href="https://maps.app.goo.gl/xA1ivmRgw5GrXmiW6" target="_blank" rel="noreferrer"><MapPin /> Get directions</a></Button>
-      </div>
-    </div></section>
-
-    <footer className="flex min-h-[70dvh] flex-col items-center justify-center bg-maroon px-6 py-24 text-center text-primary-foreground"><Monogram /><p className="mt-10 font-display text-4xl italic sm:text-5xl">With love, laughter,<br />and our whole hearts.</p><p className="mt-7 max-w-md text-sm leading-relaxed text-primary-foreground/65">We look forward to beginning forever in the company of those we love most.</p><p className="mt-12 text-xs uppercase text-gold">Krishn & Mansi · November 2026</p><div className="mt-16 h-px w-16 bg-gold/40" /><p className="mt-5 text-[9px] uppercase text-primary-foreground/45">Made with love</p></footer>
+    <footer className="invitation-footer relative flex flex-col items-center justify-center overflow-hidden border-x border-b border-gold/40 bg-maroon px-6 py-5 text-center text-primary-foreground md:py-6"><Monogram small /><p className="mt-2 font-display text-xl italic md:text-2xl">With love, laughter, and our whole hearts.</p><p className="mt-1 text-[9px] uppercase tracking-[.28em] text-primary-foreground/65">Krishn & Mansi · November 2026</p></footer>
   </main>;
 }
-
-declare global { interface Window { webkitAudioContext?: typeof AudioContext } }
