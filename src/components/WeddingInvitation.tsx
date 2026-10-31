@@ -223,13 +223,13 @@ export function WeddingInvitation() {
       <div className={`cover-content absolute inset-0 flex flex-col items-center justify-center px-5 pb-[12dvh] text-center md:pb-0 ${stage === "opening" ? "cover-content-fade" : "invitation-enter"}`}>
         <p className="text-[9px] uppercase tracking-[.3em] text-primary-foreground/80 md:text-[10px] md:tracking-[.35em]">A wedding invitation</p>
         <h1 className="mt-4 whitespace-nowrap font-display text-[2.65rem] leading-none sm:text-5xl md:mt-6 md:text-7xl">Krishn <span className="italic text-gold">&</span> Mansi</h1>
-        <div className="mt-6 md:mt-9">
+        <div className="mt-6 flex flex-col items-center md:mt-9">
           <Button type="button" variant="seal" onClick={() => openInvitation("manual")} aria-label="Open Krishn and Mansi's wedding invitation" className={`h-24 w-24 px-0 py-0 md:h-28 md:w-28 ${stage === "opening" ? "" : "seal-breathe"}`}>
             <span className="relative block h-full w-full">
               <span className="absolute inset-0 grid place-items-center font-display text-2xl italic"><span>K <span className="text-[.7em] not-italic">&</span> M</span></span>
-              <span className="absolute bottom-0 left-1/2 w-max -translate-x-1/2 translate-y-[8px] whitespace-nowrap text-center font-sans text-[7px] uppercase not-italic tracking-[.16em] md:text-[8px] md:tracking-[.22em]">Tap to enter our celebration</span>
             </span>
           </Button>
+          <p className="mt-2 whitespace-nowrap text-center font-sans text-[7px] uppercase tracking-[.16em] text-primary-foreground md:text-[8px] md:tracking-[.22em]">Tap to enter our celebration</p>
         </div>
         <p className="mt-6 font-display text-xl italic text-primary-foreground/80 md:mt-9">Begin our forever</p>
         <p className="mt-4 text-[9px] uppercase tracking-[.25em] text-primary-foreground/65 md:mt-8 md:tracking-[.28em]">22—26 November 2026</p>
